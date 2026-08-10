@@ -19,6 +19,8 @@ Current evidence includes:
 
 Documentation:
 
+- [Beginner's guide to the architecture and pipeline (Portuguese)](docs/HARNESS_VLA_GUIA_PARA_INICIANTES.md)
+- [Current functional architecture and evaluation report](docs/HARNESS_VLA_FUNCTIONAL_ARCHITECTURE_REPORT.md)
 - [Current architecture, evidence, and paper gap](docs/HARNESS_VLA_BETA_REPORT.md)
 - [Paper-aligned implementation and evaluation roadmap](docs/HARNESS_VLA_IMPLEMENTATION_ROADMAP.md)
 - [Development and evaluation practices](docs/HARNESS_VLA_BEST_PRACTICES.md)
