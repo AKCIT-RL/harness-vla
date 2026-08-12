@@ -1,0 +1,67 @@
+{
+  "protocol_name": "benchmark_frozen_v1",
+  "version": 1,
+  "classification": "beta_only",
+  "description": "Frozen evaluation battery for the Harness VLA beta on native LIBERO. Every comparison between runs, models or code revisions must use exactly these tasks, initial states and seeds, paired by (task_suite, task_id, initial_state_index, seed). This file is instrumentation for reproducible evaluation; it is not a mechanism from arXiv:2607.08448v2.",
+  "frozen": true,
+  "change_policy": "Never edit this file in place. To change the battery, create eval_protocol_v2.json and report results separately.",
+  "planner": {
+    "model": "gemma4:12b",
+    "think": true,
+    "base_url": "http://localhost:11434/v1"
+  },
+  "backend": {
+    "name": "pirlinf_websocket",
+    "model": "RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT",
+    "replan_steps": 5
+  },
+  "budgets": {
+    "max_turns": 8,
+    "horizon": 220,
+    "max_chunks_cap": 20,
+    "max_move_steps": 40,
+    "release_steps": 10
+  },
+  "offsets": {
+    "above_offset_m": 0.1,
+    "release_pose_offset_m": 0.05,
+    "position_tolerance_m": 0.01
+  },
+  "bootstrap_seeds": [7],
+  "deployment_seeds": [101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
+  "tasks": [
+    {
+      "task_suite": "libero_spatial",
+      "task_id": 0,
+      "initial_state_indices": [0, 1],
+      "note": "validated lifecycle task (bootstrap seed 7 state 0; deployment seed 101 state 1)"
+    },
+    {
+      "task_suite": "libero_spatial",
+      "task_id": 3,
+      "initial_state_indices": [0, 1]
+    },
+    {
+      "task_suite": "libero_object",
+      "task_id": 0,
+      "initial_state_indices": [0, 1]
+    },
+    {
+      "task_suite": "libero_object",
+      "task_id": 5,
+      "initial_state_indices": [0, 1]
+    }
+  ],
+  "hidden_tasks": {
+    "note": "Reserved for final held-out evaluation only. Never use during development, tuning or ablations.",
+    "tasks": [
+      { "task_suite": "libero_spatial", "task_id": 7, "initial_state_indices": [0] },
+      { "task_suite": "libero_object", "task_id": 8, "initial_state_indices": [0] }
+    ]
+  },
+  "conditions": {
+    "harness": "run_libero_multi_turn episode (planner + primitives + frozen VLA)",
+    "baseline_vla": "run_libero_vla_smoke episode (frozen VLA only, no planner)"
+  },
+  "pairing_rule": "A condition comparison is valid only over the identical set of (task_suite, task_id, initial_state_index, seed) tuples completed by both conditions."
+}
