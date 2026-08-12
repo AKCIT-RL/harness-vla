@@ -240,7 +240,7 @@ def test_new_analytic_guards_fail_closed_before_dispatch(tmp_path, invocation):
         "stage the gripper",
         {"frame": 0},
         available_targets=TARGETS,
-        budgets=_budgets(),
+        budgets=_budgets(max_turns=1),
     )
 
     assert result.termination_reason == "primitive_compile_error"
@@ -349,7 +349,7 @@ def test_release_without_holding_is_blocked_without_executor_call(tmp_path):
         "place the bowl",
         {"frame": 0},
         available_targets=TARGETS,
-        budgets=_budgets(),
+        budgets=_budgets(max_turns=1),
     )
 
     assert result.termination_reason == "release_without_holding"
@@ -375,12 +375,46 @@ def test_task_success_vla_requires_holding_target(tmp_path, holding):
         "place the bowl",
         {"frame": 0},
         available_targets=TARGETS,
-        budgets=_budgets(),
+        budgets=_budgets(max_turns=1),
         holding=holding,
     )
 
     assert result.termination_reason == "holding_incompatible"
     assert executors.calls == []
+
+
+def test_guard_violation_is_recoverable_with_feedback(tmp_path):
+    bad = {
+        "action": "vla_act",
+        "prompt": "place the bowl into plate_1",
+        "target": "plate_1",
+        "max_chunks": 1,
+        "tau": "task_success",
+    }
+    good = {"action": "release"}
+    planner = _ScriptedPlanner([bad, good])
+    executors = _FakeExecutors()
+    evaluator, trace_path = _evaluator(tmp_path, planner, executors)
+
+    result = evaluator.run(
+        "place the bowl",
+        {"frame": 0},
+        available_targets=TARGETS,
+        budgets=_budgets(),
+        holding="akita_black_bowl_1",
+    )
+
+    assert result.termination_reason == "task_success"
+    assert result.turns_executed == 2
+    assert [call[0] for call in executors.calls] == ["release"]
+    records = load_complete_jsonl(trace_path)
+    assert records[0]["feedback"]["termination_reason"] == "holding_incompatible"
+    assert records[0]["feedback"]["steps_executed"] == 0
+    second_state = planner.calls[1]["state"]
+    assert (
+        second_state["last_feedback"]["termination_reason"]
+        == "holding_incompatible"
+    )
 
 
 @pytest.mark.parametrize(
@@ -409,7 +443,7 @@ def test_move_to_with_incompatible_holding_is_blocked(tmp_path, invocation):
         "place the bowl",
         {"frame": 0},
         available_targets=TARGETS,
-        budgets=_budgets(),
+        budgets=_budgets(max_turns=1),
         holding=None,
     )
 

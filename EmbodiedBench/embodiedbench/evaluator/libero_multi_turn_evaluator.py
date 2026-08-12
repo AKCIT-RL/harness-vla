@@ -224,16 +224,19 @@ class LiberoMultiTurnEvaluator:
                     roles,
                     timing=self._timing(turn_ts, turn_started, planner_duration),
                 )
-                return self._result(
-                    current_observation,
-                    current_holding,
-                    False,
-                    False,
-                    False,
-                    guard_reason,
-                    turn_index,
-                    steps_executed,
-                )
+                if turn_index >= budgets.max_turns:
+                    return self._result(
+                        current_observation,
+                        current_holding,
+                        False,
+                        False,
+                        False,
+                        guard_reason,
+                        turn_index,
+                        steps_executed,
+                    )
+                last_feedback = feedback
+                continue
 
             action = invocation["action"]
             step_budget = self._step_budget(action, actions_remaining, budgets)
