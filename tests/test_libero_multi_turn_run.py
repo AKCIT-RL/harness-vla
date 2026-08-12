@@ -189,6 +189,7 @@ def test_success_writes_complete_artifacts_and_excludes_settling_from_horizon(
     assert result["episode"]["horizon"] == 2
     assert result["manifest"]["status"] == "completed"
     assert {path.name for path in run_root.iterdir()} == {
+        "actions.jsonl",
         "episode.json",
         "run_manifest.json",
         "summary.json",

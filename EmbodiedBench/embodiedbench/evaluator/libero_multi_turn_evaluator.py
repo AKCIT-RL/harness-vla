@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
+import time
 from typing import Any, Callable, Dict, Optional, Sequence
 
+from embodiedbench.evaluator.libero_action_log import flatten_turn_actions
 from embodiedbench.evaluator.libero_analytic_executor import (
     LiberoPrimitiveExecution,
 )
@@ -23,6 +26,10 @@ from embodiedbench.planner.harness.libero_primitives import (
 def _positive_integer(value: int, name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
         raise ValueError("%s must be an integer greater than zero" % name)
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 @dataclass(frozen=True)
@@ -89,6 +96,7 @@ class LiberoMultiTurnEvaluator:
         self.move_executor = move_executor
         self.release_executor = release_executor
         self.trace_path = Path(trace_path)
+        self.actions_path = self.trace_path.parent / "actions.jsonl"
         self.file_repl_bridge = file_repl_bridge
         self.diagnostics_callback = diagnostics_callback
 
@@ -106,6 +114,7 @@ class LiberoMultiTurnEvaluator:
         protocol_metadata: Optional[Dict[str, Any]] = None,
     ) -> LiberoMultiTurnResult:
         initialize_jsonl(self.trace_path)
+        initialize_jsonl(self.actions_path)
         current_observation = observation
         current_holding = holding
         last_action = None
@@ -143,6 +152,8 @@ class LiberoMultiTurnEvaluator:
                     "actions_remaining": actions_remaining,
                 },
             }
+            turn_started = time.perf_counter()
+            turn_ts = _utc_now_iso()
             invocation, raw_output = self.planner.act_turn(
                 instruction,
                 state,
@@ -154,6 +165,7 @@ class LiberoMultiTurnEvaluator:
                     else {}
                 ),
             )
+            planner_duration = time.perf_counter() - turn_started
             planner_thinking = getattr(self.planner, "last_thinking", None)
 
             if invocation is None:
@@ -176,6 +188,7 @@ class LiberoMultiTurnEvaluator:
                     [],
                     labels,
                     roles,
+                    timing=self._timing(turn_ts, turn_started, planner_duration),
                 )
                 return self._result(
                     current_observation,
@@ -209,6 +222,7 @@ class LiberoMultiTurnEvaluator:
                     [],
                     labels,
                     roles,
+                    timing=self._timing(turn_ts, turn_started, planner_duration),
                 )
                 return self._result(
                     current_observation,
@@ -245,6 +259,7 @@ class LiberoMultiTurnEvaluator:
                     [],
                     labels,
                     roles,
+                    timing=self._timing(turn_ts, turn_started, planner_duration),
                 )
                 return self._result(
                     current_observation,
@@ -265,6 +280,7 @@ class LiberoMultiTurnEvaluator:
                 privileged_diagnostics.extend(
                     self._diagnose("pre_release", invocation, holding_before)
                 )
+            execution_started = time.perf_counter()
             if self.file_repl_bridge is not None:
                 dispatched, protocol_turn = self.file_repl_bridge.dispatch(
                     invocation,
@@ -301,6 +317,7 @@ class LiberoMultiTurnEvaluator:
                 execution = self.release_executor(
                     invocation, current_observation, max_steps=step_budget
                 )
+            execution_duration = time.perf_counter() - execution_started
 
             self._validate_execution(execution, step_budget)
             current_observation = execution.observation
@@ -358,6 +375,13 @@ class LiberoMultiTurnEvaluator:
                 protocol_metadata,
                 protocol_turn,
                 privileged_diagnostics,
+                timing=self._timing(
+                    turn_ts,
+                    turn_started,
+                    planner_duration,
+                    execution_duration=execution_duration,
+                    steps_executed=execution.steps_executed,
+                ),
             )
             primitive_success = execution.primitive_success
             last_action = action
@@ -533,6 +557,29 @@ class LiberoMultiTurnEvaluator:
                 "error": {"type": type(exc).__name__, "message": str(exc)},
             }]
 
+    @staticmethod
+    def _timing(
+        turn_ts: str,
+        turn_started: float,
+        planner_duration: float,
+        *,
+        execution_duration: Optional[float] = None,
+        steps_executed: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Beta-only wall-clock instrumentation; not a paper mechanism."""
+        timing = {
+            "ts": turn_ts,
+            "planner_duration_s": round(planner_duration, 6),
+            "turn_duration_s": round(time.perf_counter() - turn_started, 6),
+        }
+        if execution_duration is not None:
+            timing["execution_duration_s"] = round(execution_duration, 6)
+            if steps_executed:
+                timing["mean_step_duration_s"] = round(
+                    execution_duration / steps_executed, 6
+                )
+        return timing
+
     def _record(
         self,
         turn: int,
@@ -546,6 +593,7 @@ class LiberoMultiTurnEvaluator:
         protocol_metadata: Optional[Dict[str, Any]] = None,
         protocol_turn: Optional[Dict[str, Any]] = None,
         privileged_diagnostics=None,
+        timing: Optional[Dict[str, Any]] = None,
     ) -> None:
         primitive = invocation.get("action") if isinstance(invocation, dict) else None
         record = {
@@ -572,10 +620,19 @@ class LiberoMultiTurnEvaluator:
             }
         if privileged_diagnostics:
             record["privileged_diagnostics"] = privileged_diagnostics
+        if timing is not None:
+            record["timing"] = timing
         append_jsonl_record(
             self.trace_path,
             record,
         )
+        for action_record in flatten_turn_actions(
+            turn,
+            primitive,
+            primitive_trace,
+            ts=(timing or {}).get("ts"),
+        ):
+            append_jsonl_record(self.actions_path, action_record)
 
     @staticmethod
     def _result(
