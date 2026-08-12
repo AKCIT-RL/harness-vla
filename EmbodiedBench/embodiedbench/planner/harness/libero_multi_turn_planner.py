@@ -38,7 +38,13 @@ the available max_chunks cap; tau already returns early, so do not issue a
 one-chunk probe before the same contact prompt.
 Use tau=task_success only for contact-rich placement while holding exactly the
 target object. The prompt must explicitly name the grounded destination. This
-mode terminates only on the environment's official task-success predicate."""
+mode terminates only on the environment's official task-success predicate.
+CRITICAL: in every vla_act the "target" field is ALWAYS the object being
+manipulated (the held object during placement), NEVER the destination. The
+destination appears only inside the "prompt" text. While holding
+alphabet_soup_1 to place it in basket_1, emit
+{"action":"vla_act","prompt":"place the alphabet soup in the basket","target":"alphabet_soup_1","max_chunks":20,"tau":"task_success"}
+and never "target":"basket_1"; a destination target aborts the episode."""
 
 
 def _valid_cap(value: int, name: str) -> None:

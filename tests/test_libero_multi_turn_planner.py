@@ -144,6 +144,9 @@ def test_planner_turn_contains_semantic_state_without_pose_or_oracle():
     assert "contact-rich placement" in MULTI_TURN_SYSTEM_PROMPT
     assert "holding exactly the" in MULTI_TURN_SYSTEM_PROMPT
     assert "name the grounded destination" in MULTI_TURN_SYSTEM_PROMPT
+    assert "NEVER the destination" in MULTI_TURN_SYSTEM_PROMPT
+    assert '"target":"alphabet_soup_1"' in MULTI_TURN_SYSTEM_PROMPT
+    assert 'never "target":"basket_1"' in MULTI_TURN_SYSTEM_PROMPT
 
 
 def test_planner_turn_includes_symbolic_memory_context_and_rejects_pose_data():
