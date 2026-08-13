@@ -459,7 +459,7 @@ class LiberoMultiTurnEvaluator:
         if action == "vla_act":
             target = invocation.get("target")
             if invocation.get("tau") == "task_success":
-                if holding != target:
+                if holding is not None and holding != target:
                     return "holding_incompatible"
             elif holding not in (None, target):
                 return "holding_incompatible"

@@ -358,7 +358,7 @@ def test_release_without_holding_is_blocked_without_executor_call(tmp_path):
     assert load_complete_jsonl(trace_path)[0]["feedback"]["steps_executed"] == 0
 
 
-@pytest.mark.parametrize("holding", [None, "plate_1"])
+@pytest.mark.parametrize("holding", ["plate_1"])
 def test_task_success_vla_requires_holding_target(tmp_path, holding):
     invocation = {
         "action": "vla_act",
@@ -381,6 +381,29 @@ def test_task_success_vla_requires_holding_target(tmp_path, holding):
 
     assert result.termination_reason == "holding_incompatible"
     assert executors.calls == []
+
+
+def test_task_success_vla_with_empty_hand_reaches_executor(tmp_path):
+    invocation = {
+        "action": "vla_act",
+        "prompt": "open the middle drawer of the cabinet",
+        "target": "plate_1",
+        "max_chunks": 1,
+        "tau": "task_success",
+    }
+    planner = _ScriptedPlanner([invocation])
+    executors = _FakeExecutors()
+    evaluator, _ = _evaluator(tmp_path, planner, executors)
+
+    evaluator.run(
+        "open the drawer",
+        {"frame": 0},
+        available_targets=TARGETS,
+        budgets=_budgets(max_turns=1),
+        holding=None,
+    )
+
+    assert [call[0] for call in executors.calls] == ["vla_act"]
 
 
 def test_guard_violation_is_recoverable_with_feedback(tmp_path):
