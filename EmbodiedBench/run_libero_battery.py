@@ -52,6 +52,11 @@ def parse_args():
     )
     parser.add_argument("--seeds", type=int, nargs="+")
     parser.add_argument("--include-hidden", action="store_true")
+    parser.add_argument(
+        "--hidden-only",
+        action="store_true",
+        help="Run only the held-out hidden tasks (final evaluation).",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
@@ -195,6 +200,7 @@ def main():
         condition=args.condition,
         seeds=args.seeds,
         include_hidden=args.include_hidden,
+        hidden_only=args.hidden_only,
         resume=not args.no_resume,
     )
     print(json.dumps(outcome["summary"], indent=2))
