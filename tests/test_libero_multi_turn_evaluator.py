@@ -634,7 +634,7 @@ def test_planner_parse_error_is_traced_without_dispatch(tmp_path):
         "place the bowl",
         {"frame": 0},
         available_targets=TARGETS,
-        budgets=_budgets(),
+        budgets=_budgets(max_turns=1),
     )
 
     assert result.termination_reason == "planner_parse_error"

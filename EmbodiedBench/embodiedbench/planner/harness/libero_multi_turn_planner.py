@@ -166,8 +166,11 @@ def parse_libero_multi_turn_invocation(
 class LiberoMultiTurnPlanner(LiberoVLAPlanner):
     """Ollama planner that receives semantic state and emits one primitive."""
 
+    _chat_attempts = 3
+
     def _chat(self, user_prompt: str) -> str:
-        from urllib import request
+        import time
+        from urllib import error, request
 
         options = {"temperature": 0}
         if self.think:
@@ -187,11 +190,22 @@ class LiberoMultiTurnPlanner(LiberoVLAPlanner):
         req = request.Request(
             self._endpoint(), data=payload, headers={"Content-Type": "application/json"}
         )
-        with request.urlopen(req, timeout=self.request_timeout) as response:
-            result = json.load(response)
-        message = result.get("message", {})
-        self.last_thinking = message.get("thinking") or None
-        return message.get("content", "")
+        for attempt in range(self._chat_attempts):
+            try:
+                with request.urlopen(req, timeout=self.request_timeout) as response:
+                    result = json.load(response)
+            except (error.URLError, OSError, ValueError):
+                time.sleep(min(5 * (attempt + 1), 15))
+                continue
+            message = result.get("message", {})
+            content = message.get("content", "")
+            if content.strip():
+                self.last_thinking = message.get("thinking") or None
+                return content
+            # empty content is a transient backend failure; retry
+            time.sleep(min(5 * (attempt + 1), 15))
+        self.last_thinking = None
+        return ""
 
     def act_turn(
         self,

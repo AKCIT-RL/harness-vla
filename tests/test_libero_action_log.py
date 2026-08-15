@@ -17,14 +17,16 @@ from embodiedbench.planner.harness.trace_io import load_complete_jsonl
 TARGET = "akita_black_bowl_1"
 
 
-def _budgets():
-    return LiberoMultiTurnBudgets(
-        max_turns=4,
-        horizon=20,
-        max_chunks_cap=4,
-        max_move_steps=5,
-        release_steps=3,
-    )
+def _budgets(**overrides):
+    values = {
+        "max_turns": 4,
+        "horizon": 20,
+        "max_chunks_cap": 4,
+        "max_move_steps": 5,
+        "release_steps": 3,
+    }
+    values.update(overrides)
+    return LiberoMultiTurnBudgets(**values)
 
 
 class _Planner:
@@ -101,7 +103,7 @@ def test_flatten_tolerates_missing_or_malformed_traces():
     assert flatten_turn_actions(1, "vla_act", [{"event": "tau_setup_error"}]) == []
 
 
-def _run_episode(tmp_path, invocations, executors):
+def _run_episode(tmp_path, invocations, executors, **budget_overrides):
     trace_path = tmp_path / "trace.jsonl"
     evaluator = LiberoMultiTurnEvaluator(
         _Planner(invocations),
@@ -114,7 +116,7 @@ def _run_episode(tmp_path, invocations, executors):
         "place the bowl on the plate",
         {"frame": 0},
         available_targets=[TARGET, "plate_1"],
-        budgets=_budgets(),
+        budgets=_budgets(**budget_overrides),
     )
     return result, trace_path, tmp_path / "actions.jsonl"
 
@@ -168,7 +170,7 @@ def test_evaluator_writes_timing_and_actions_jsonl(tmp_path):
 
 def test_parse_error_turn_records_timing_without_actions(tmp_path):
     result, trace_path, actions_path = _run_episode(
-        tmp_path, [None], _executors()
+        tmp_path, [None], _executors(), max_turns=1
     )
     assert result.termination_reason == "planner_parse_error"
     records = load_complete_jsonl(trace_path)
