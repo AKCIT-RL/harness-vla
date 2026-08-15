@@ -52,11 +52,6 @@ def parse_args():
     )
     parser.add_argument("--seeds", type=int, nargs="+")
     parser.add_argument("--include-hidden", action="store_true")
-    parser.add_argument(
-        "--hidden-only",
-        action="store_true",
-        help="Run only the held-out hidden tasks (final evaluation).",
-    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
@@ -70,6 +65,12 @@ def parse_args():
         help="Battery folder name; reuse an existing one to resume it.",
     )
     parser.add_argument("--no-resume", action="store_true")
+    parser.add_argument(
+        "--planner-think",
+        choices=("on", "off"),
+        default=None,
+        help="Override the protocol planner.think value (beta-only ablation).",
+    )
     return parser.parse_args()
 
 
@@ -117,12 +118,15 @@ def make_episode_runner(args, protocol):
                 replan_steps=int(backend_config.get("replan_steps", 5)),
             )
             if spec["condition"] == "harness":
+                think = bool(planner_config.get("think", True))
+                if args.planner_think is not None:
+                    think = args.planner_think == "on"
                 planner = LiberoMultiTurnPlanner(
                     planner_config.get("model", "gemma4:12b"),
                     base_url=planner_config.get(
                         "base_url", "http://localhost:11434/v1"
                     ),
-                    think=bool(planner_config.get("think", True)),
+                    think=think,
                     required_tau="lift_and_grasp",
                 )
                 budgets = LiberoMultiTurnBudgets(
@@ -200,7 +204,6 @@ def main():
         condition=args.condition,
         seeds=args.seeds,
         include_hidden=args.include_hidden,
-        hidden_only=args.hidden_only,
         resume=not args.no_resume,
     )
     print(json.dumps(outcome["summary"], indent=2))
