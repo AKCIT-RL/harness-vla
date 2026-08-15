@@ -119,6 +119,7 @@ class LiberoMultiTurnEvaluator:
         current_holding = holding
         last_action = None
         last_feedback = None
+        turn_history = []
         steps_executed = 0
         primitive_success = False
         labels = dict(object_labels or {})
@@ -147,6 +148,7 @@ class LiberoMultiTurnEvaluator:
                 "holding": current_holding,
                 "last_action": last_action,
                 "last_feedback": last_feedback,
+                "turn_history": list(turn_history),
                 "budget": {
                     "turns_remaining": budgets.max_turns - turn_index + 1,
                     "actions_remaining": actions_remaining,
@@ -201,6 +203,9 @@ class LiberoMultiTurnEvaluator:
                         turn_index,
                         steps_executed,
                     )
+                turn_history.append(
+                    self._history_entry(turn_index, None, "planner_parse_error", current_holding)
+                )
                 last_feedback = feedback
                 continue
 
@@ -238,6 +243,9 @@ class LiberoMultiTurnEvaluator:
                         turn_index,
                         steps_executed,
                     )
+                turn_history.append(
+                    self._history_entry(turn_index, invocation, guard_reason, current_holding)
+                )
                 last_feedback = feedback
                 continue
 
@@ -392,6 +400,14 @@ class LiberoMultiTurnEvaluator:
             primitive_success = execution.primitive_success
             last_action = action
             last_feedback = feedback
+            turn_history.append(
+                self._history_entry(
+                    turn_index,
+                    invocation,
+                    feedback.get("termination_reason"),
+                    current_holding,
+                )
+            )
 
             if execution.task_success:
                 return self._result(
@@ -437,6 +453,22 @@ class LiberoMultiTurnEvaluator:
             budgets.max_turns,
             steps_executed,
         )
+
+    @staticmethod
+    def _history_entry(
+        turn_index: int,
+        invocation: Optional[Dict[str, object]],
+        result: Optional[str],
+        holding_after: Optional[str],
+    ) -> Dict[str, object]:
+        entry: Dict[str, object] = {"turn": turn_index, "result": result}
+        if invocation is not None:
+            entry["action"] = invocation.get("action")
+            for key in ("target", "mode", "tau"):
+                if key in invocation:
+                    entry[key] = invocation[key]
+        entry["holding_after"] = holding_after
+        return entry
 
     @staticmethod
     def _guard_invocation(

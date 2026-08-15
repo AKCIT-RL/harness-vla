@@ -149,6 +149,8 @@ def test_planner_turn_contains_semantic_state_without_pose_or_oracle():
     assert 'never "target":"basket_1"' in MULTI_TURN_SYSTEM_PROMPT
     assert "reserve" in MULTI_TURN_SYSTEM_PROMPT
     assert "for the FINAL object only" in MULTI_TURN_SYSTEM_PROMPT
+    assert "turn_history" in MULTI_TURN_SYSTEM_PROMPT
+    assert "never grasp or place it again" in MULTI_TURN_SYSTEM_PROMPT
 
 
 def test_planner_turn_includes_symbolic_memory_context_and_rejects_pose_data():

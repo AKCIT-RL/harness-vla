@@ -660,6 +660,27 @@ def test_planner_parse_error_is_traced_without_dispatch(tmp_path):
     }
 
 
+def test_turn_history_accumulates_symbolic_entries(tmp_path):
+    planner = _ScriptedPlanner(_happy_script())
+    executors = _FakeExecutors()
+    evaluator, _ = _evaluator(tmp_path, planner, executors)
+
+    evaluator.run(
+        "place the bowl",
+        {"frame": 0},
+        available_targets=TARGETS,
+        budgets=_budgets(),
+    )
+
+    assert planner.calls[0]["state"]["turn_history"] == []
+    third_state = planner.calls[2]["state"]
+    history = third_state["turn_history"]
+    assert [h["action"] for h in history] == ["vla_act", "move_to"]
+    assert history[0]["target"] == "akita_black_bowl_1"
+    assert history[0]["holding_after"] == "akita_black_bowl_1"
+    assert "xyz" not in json.dumps(history)
+
+
 def test_trace_has_one_reconstructable_record_per_turn(tmp_path):
     planner = _ScriptedPlanner(_happy_script())
     executors = _FakeExecutors()

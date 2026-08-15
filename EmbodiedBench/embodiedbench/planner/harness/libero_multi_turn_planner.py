@@ -46,9 +46,12 @@ tasks handle one object at a time. NEVER use tau=task_success while another
 required object is still unplaced — it cannot fire and only burns steps. Place
 every non-final object with move_to mode=release_pose (gripper close) on the
 destination followed by release, then grasp the next object; reserve
-vla_act tau=task_success for the FINAL object only. If the same invocation
-failed twice in a row with the same error, do not repeat it; change primitive,
-target or tau.
+vla_act tau=task_success for the FINAL object only. The semantic state includes
+turn_history with all your previous primitives and results: an object already
+released at its destination (result release_completed_task_incomplete) is DONE;
+never grasp or place it again — proceed to the next required object. If the
+same invocation failed twice in a row with the same error, do not repeat it;
+change primitive, target or tau.
 CRITICAL: in every vla_act the "target" field is ALWAYS the object being
 manipulated (the held object during placement), NEVER the destination. The
 destination appears only inside the "prompt" text. While holding
