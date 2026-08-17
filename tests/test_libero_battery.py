@@ -103,21 +103,6 @@ def test_expand_matrix_includes_hidden_only_when_requested():
     assert not any(m["task_id"] == 7 for m in visible)
 
 
-def test_expand_matrix_hidden_only_runs_just_hidden_tasks():
-    hidden = expand_protocol_matrix(
-        _protocol(), condition="harness", hidden_only=True
-    )
-    assert len(hidden) == 2  # one hidden (task, state) pair x two seeds
-    assert all(m["task_id"] == 7 for m in hidden)
-
-
-def test_expand_matrix_hidden_only_rejects_protocol_without_hidden_tasks():
-    protocol = _protocol()
-    protocol.pop("hidden_tasks")
-    with pytest.raises(ValueError, match="no hidden tasks"):
-        expand_protocol_matrix(protocol, condition="harness", hidden_only=True)
-
-
 def test_episode_name_is_deterministic():
     spec = {
         "condition": "harness",

@@ -62,7 +62,6 @@ def expand_protocol_matrix(
     condition: str,
     seeds: Optional[Sequence[int]] = None,
     include_hidden: bool = False,
-    hidden_only: bool = False,
 ) -> List[Dict[str, Any]]:
     """Expand the frozen protocol into an ordered list of episode specs."""
     if not isinstance(condition, str) or not condition:
@@ -77,14 +76,9 @@ def expand_protocol_matrix(
             "seeds not declared by the frozen protocol: %s"
             % ", ".join(str(seed) for seed in undeclared)
         )
-    if hidden_only:
-        tasks = list(protocol.get("hidden_tasks", {}).get("tasks", []))
-        if not tasks:
-            raise ValueError("protocol declares no hidden tasks")
-    else:
-        tasks = list(protocol["tasks"])
-        if include_hidden:
-            tasks.extend(protocol.get("hidden_tasks", {}).get("tasks", []))
+    tasks = list(protocol["tasks"])
+    if include_hidden:
+        tasks.extend(protocol.get("hidden_tasks", {}).get("tasks", []))
     matrix = []
     for task in tasks:
         for state_index in task["initial_state_indices"]:
@@ -160,7 +154,6 @@ def run_battery(
     condition: str,
     seeds: Optional[Sequence[int]] = None,
     include_hidden: bool = False,
-    hidden_only: bool = False,
     resume: bool = True,
 ) -> Dict[str, Any]:
     """Run the full episode matrix sequentially and durably persist results.
@@ -174,11 +167,7 @@ def run_battery(
     episodes_root = root / "episodes"
     episodes_root.mkdir(exist_ok=True)
     matrix = expand_protocol_matrix(
-        protocol,
-        condition=condition,
-        seeds=seeds,
-        include_hidden=include_hidden,
-        hidden_only=hidden_only,
+        protocol, condition=condition, seeds=seeds, include_hidden=include_hidden
     )
     manifest = {
         "run_type": "libero_battery",
@@ -189,7 +178,6 @@ def run_battery(
         "condition": condition,
         "seeds": list(protocol["deployment_seeds"] if seeds is None else seeds),
         "include_hidden": bool(include_hidden),
-        "hidden_only": bool(hidden_only),
         "episodes_planned": len(matrix),
         "git_commit": resolve_git_commit(Path(__file__)),
         "status": "in_progress",
