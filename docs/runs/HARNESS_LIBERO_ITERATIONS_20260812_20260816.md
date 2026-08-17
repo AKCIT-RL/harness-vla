@@ -18,6 +18,10 @@ abaixo alega fidelidade a mecanismo de arXiv:2607.08448v2 salvo indicação).
 | probe_v3 (5 ep, libero_90) | **harness + iter 1-6** | **60,0% (3/5)** |
 | frozen_v1 seed 101 (8 ep) | harness think=on | 8/8; planner 91 s/turno (média) |
 | frozen_v1 seed 101 (8 ep) | harness think=off | 7/8; planner 36 s/turno (média) |
+| **ocultas** frozen_v1 (6 ep, 3 seeds) | baseline VLA puro | 0,0% (0/6) |
+| **ocultas** frozen_v1 (6 ep, 3 seeds) | **harness + iter 1-6** | **83,3% (5/6)** |
+| **ocultas** probe_v2 (2 ep) | baseline VLA puro | 50,0% (1/2) |
+| **ocultas** probe_v2 (2 ep) | harness + iter 1-6 | 50,0% (1/2) |
 
 Pareamento sempre por (task_suite, task_id, initial_state_index, seed).
 
@@ -89,6 +93,23 @@ manifests (0 falhas de infraestrutura).
 | `battery_probe_v3_harness_fix6_20260816` | 3/5 (60%) | sucessos: botão do fogão, relacional, livro no compartimento; falhas: stacking e fogão+panela (horizonte) |
 | `battery_probe_v3_baseline_20260816` | 1/5 (20%) | só o botão do fogão |
 | `battery_frozen_v1_harness_fix6_nothink_20260816` | 7/8 (87,5%) | think=off; planner 36 s/turno vs 91 s/turno com think (2,5× mais rápido, −1 sucesso) |
+
+## Avaliação oculta anti-overfitting (17/08, fila `run_hidden_eval_queue_20260817.sh`)
+
+Primeira e única execução das tarefas ocultas dos protocolos v1 e v2, com o
+código congelado após a iter 6 e **nenhum ajuste posterior**. Requereu o novo
+modo `--hidden-only` (beta-only).
+
+- frozen_v1 ocultas (spatial 7 + object 8 × seeds 101-103): harness **5/6**
+  vs baseline **0/6**. O padrão das visíveis se repete: baseline zera em
+  libero_object; harness resolve com o subprompt correto.
+- probe_v2 ocultas (goal 7 + libero_10 8, seed 101): harness 1/2 vs baseline
+  1/2. A falha ("put both moka pots on the stove") é o modo de falha físico já
+  conhecido: o VLA erra o grasp da 1ª moka pot em 4 tentativas (o planner até
+  tentou recuperação com `move_to above`); não é falha de lógica nem de
+  prompt decorado.
+- Veredito: as regras das iters 1-6 **generalizam** — total oculto 6/8 (75%)
+  vs baseline 1/8 (12,5%), consistente com as visíveis.
 
 ## Lacunas conhecidas
 
