@@ -1,0 +1,106 @@
+[
+ {
+  "file": "libero_10_task00_failure.mp4",
+  "suite": "libero_10",
+  "task_id": 0,
+  "success": false,
+  "instruction": "put both the alphabet soup and the tomato sauce in the basket",
+  "kb": 292
+ },
+ {
+  "file": "libero_10_task03_success.mp4",
+  "suite": "libero_10",
+  "task_id": 3,
+  "success": true,
+  "instruction": "put the black bowl in the bottom drawer of the cabinet and close it",
+  "kb": 195
+ },
+ {
+  "file": "libero_90_task17_failure.mp4",
+  "suite": "libero_90",
+  "task_id": 17,
+  "success": false,
+  "instruction": "stack the middle black bowl on the back black bowl",
+  "kb": 338
+ },
+ {
+  "file": "libero_90_task20_success.mp4",
+  "suite": "libero_90",
+  "task_id": 20,
+  "success": true,
+  "instruction": "turn on the stove",
+  "kb": 77
+ },
+ {
+  "file": "libero_90_task21_failure.mp4",
+  "suite": "libero_90",
+  "task_id": 21,
+  "success": false,
+  "instruction": "turn on the stove and put the frying pan on it",
+  "kb": 271
+ },
+ {
+  "file": "libero_90_task37_success.mp4",
+  "suite": "libero_90",
+  "task_id": 37,
+  "success": true,
+  "instruction": "put the white bowl to the right of the plate",
+  "kb": 106
+ },
+ {
+  "file": "libero_90_task74_success.mp4",
+  "suite": "libero_90",
+  "task_id": 74,
+  "success": true,
+  "instruction": "pick up the book and place it in the left compartment of the caddy",
+  "kb": 97
+ },
+ {
+  "file": "libero_goal_task00_success.mp4",
+  "suite": "libero_goal",
+  "task_id": 0,
+  "success": true,
+  "instruction": "open the middle drawer of the cabinet",
+  "kb": 108
+ },
+ {
+  "file": "libero_goal_task01_success.mp4",
+  "suite": "libero_goal",
+  "task_id": 1,
+  "success": true,
+  "instruction": "put the bowl on the stove",
+  "kb": 71
+ },
+ {
+  "file": "libero_object_task00_success.mp4",
+  "suite": "libero_object",
+  "task_id": 0,
+  "success": true,
+  "instruction": "pick up the alphabet soup and place it in the basket",
+  "kb": 108
+ },
+ {
+  "file": "libero_object_task05_success.mp4",
+  "suite": "libero_object",
+  "task_id": 5,
+  "success": true,
+  "instruction": "pick up the tomato sauce and place it in the basket",
+  "kb": 98
+ },
+ {
+  "file": "libero_spatial_task00_success.mp4",
+  "suite": "libero_spatial",
+  "task_id": 0,
+  "success": true,
+  "instruction": "pick up the black bowl between the plate and the ramekin and place it on the plate",
+  "kb": 74
+ },
+ {
+  "file": "libero_spatial_task03_success.mp4",
+  "suite": "libero_spatial",
+  "task_id": 3,
+  "success": true,
+  "instruction": "pick up the black bowl on the cookie box and place it on the plate",
+  "kb": 87
+ }
+]
