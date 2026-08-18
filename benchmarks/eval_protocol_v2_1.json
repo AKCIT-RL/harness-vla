@@ -1,0 +1,102 @@
+{
+  "protocol_name": "benchmark_probe_v2_1",
+  "version": "2.1",
+  "classification": "beta_only",
+  "description": "Difficulty-ladder probe battery for the Harness VLA beta on native LIBERO (levels 2-3: libero_goal and libero_10). Comparisons are valid only within this protocol, paired by (task_suite, task_id, initial_state_index, seed). This file is instrumentation for reproducible evaluation; it is not a mechanism from arXiv:2607.08448v2.",
+  "frozen": true,
+  "change_policy": "Never edit this file in place. To change the battery, create eval_protocol_v3.json and report results separately.",
+  "planner": {
+    "model": "gemma4:12b",
+    "think": true,
+    "base_url": "http://localhost:11434/v1"
+  },
+  "backend": {
+    "name": "pirlinf_websocket",
+    "model": "RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT",
+    "replan_steps": 5
+  },
+  "budgets": {
+    "max_turns": 12,
+    "horizon": 400,
+    "max_chunks_cap": 20,
+    "max_move_steps": 40,
+    "release_steps": 10,
+    "note": "max_turns and horizon raised vs v1 because libero_10 tasks are long-horizon; beta-only calibration choice so budget exhaustion does not mask other failure modes."
+  },
+  "offsets": {
+    "above_offset_m": 0.1,
+    "release_pose_offset_m": 0.05,
+    "position_tolerance_m": 0.01
+  },
+  "bootstrap_seeds": [
+    7
+  ],
+  "deployment_seeds": [
+    101,
+    102,
+    103
+  ],
+  "tasks": [
+    {
+      "task_suite": "libero_goal",
+      "task_id": 0,
+      "initial_state_indices": [
+        0,
+        1
+      ],
+      "note": "open the middle drawer of the cabinet \u2014 articulated fixture, no held object; probes the tau=task_success holding contract"
+    },
+    {
+      "task_suite": "libero_goal",
+      "task_id": 1,
+      "initial_state_indices": [
+        0,
+        1
+      ],
+      "note": "put the bowl on the stove \u2014 pick-and-place control within the goal scene"
+    },
+    {
+      "task_suite": "libero_10",
+      "task_id": 0,
+      "initial_state_indices": [
+        0,
+        1
+      ],
+      "note": "put both the alphabet soup and the tomato sauce in the basket \u2014 two-object sequence; probes multi-step planning"
+    },
+    {
+      "task_suite": "libero_10",
+      "task_id": 3,
+      "initial_state_indices": [
+        0,
+        1
+      ],
+      "note": "put the black bowl in the bottom drawer and close it \u2014 pick-and-place plus articulation combo"
+    }
+  ],
+  "hidden_tasks": {
+    "note": "Reserved for final held-out evaluation only. Never use during development, tuning or ablations.",
+    "tasks": [
+      {
+        "task_suite": "libero_goal",
+        "task_id": 7,
+        "initial_state_indices": [
+          0
+        ]
+      },
+      {
+        "task_suite": "libero_10",
+        "task_id": 8,
+        "initial_state_indices": [
+          0
+        ]
+      }
+    ]
+  },
+  "conditions": {
+    "harness": "run_libero_multi_turn episode (planner + primitives + frozen VLA)",
+    "baseline_vla": "run_libero_vla_smoke episode (frozen VLA only, no planner)"
+  },
+  "pairing_rule": "A condition comparison is valid only over the identical set of (task_suite, task_id, initial_state_index, seed) tuples completed by both conditions.",
+  "notes": "v_1: extends deployment_seeds to 101-103; tasks/budgets identical to parent protocol."
+}

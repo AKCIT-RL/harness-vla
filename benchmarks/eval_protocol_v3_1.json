@@ -1,0 +1,82 @@
+{
+  "protocol_name": "benchmark_probe_v3_1",
+  "version": "3.1",
+  "classification": "beta_only",
+  "description": "Skill-family probe battery for the Harness VLA beta on native LIBERO (libero_90). Extends the difficulty ladder of benchmark_probe_v2 with five skill families not covered by v1/v2: stacking, knob articulation, fixture+pick-place composition, relational placement without a container, and fine-grained container compartments. Comparisons are valid only within this protocol, paired by (task_suite, task_id, initial_state_index, seed). This file is instrumentation for reproducible evaluation; it is not a mechanism from arXiv:2607.08448v2.",
+  "frozen": true,
+  "change_policy": "Never edit this file in place. To change the battery, create eval_protocol_v4.json and report results separately.",
+  "planner": {
+    "model": "gemma4:12b",
+    "think": true,
+    "base_url": "http://localhost:11434/v1"
+  },
+  "backend": {
+    "name": "pirlinf_websocket",
+    "model": "RLinf/RLinf-Pi05-LIBERO-130-fullshot-SFT",
+    "replan_steps": 5
+  },
+  "budgets": {
+    "max_turns": 12,
+    "horizon": 400,
+    "max_chunks_cap": 20,
+    "max_move_steps": 40,
+    "release_steps": 10,
+    "note": "Same budgets as benchmark_probe_v2; beta-only calibration choice so budget exhaustion does not mask other failure modes."
+  },
+  "offsets": {
+    "above_offset_m": 0.1,
+    "release_pose_offset_m": 0.05,
+    "position_tolerance_m": 0.01
+  },
+  "bootstrap_seeds": [
+    7
+  ],
+  "deployment_seeds": [
+    101,
+    102,
+    103
+  ],
+  "tasks": [
+    {
+      "task_suite": "libero_90",
+      "task_id": 17,
+      "initial_state_indices": [
+        0
+      ],
+      "note": "stack the middle black bowl on the back black bowl - stacking skill family, object-on-object placement with spatial disambiguation"
+    },
+    {
+      "task_suite": "libero_90",
+      "task_id": 20,
+      "initial_state_indices": [
+        0
+      ],
+      "note": "turn on the stove - knob articulation, empty-hand fixture manipulation distinct from drawers"
+    },
+    {
+      "task_suite": "libero_90",
+      "task_id": 21,
+      "initial_state_indices": [
+        0
+      ],
+      "note": "turn on the stove and put the frying pan on it - fixture articulation composed with pick-and-place"
+    },
+    {
+      "task_suite": "libero_90",
+      "task_id": 37,
+      "initial_state_indices": [
+        0
+      ],
+      "note": "put the white bowl to the right of the plate - relational placement without a container"
+    },
+    {
+      "task_suite": "libero_90",
+      "task_id": 74,
+      "initial_state_indices": [
+        0
+      ],
+      "note": "pick up the book and place it in the left compartment of the caddy - fine-grained compartment grounding"
+    }
+  ],
+  "notes": "v_1: extends deployment_seeds to 101-103; tasks/budgets identical to parent protocol."
+}
