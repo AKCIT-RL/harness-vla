@@ -1,6 +1,6 @@
 """Simulator-free tests for Harness evaluator pre-execution guards."""
 
-from embodiedbench.planner.harness.evaluation_guards import (
+from harness_vla.evaluation_guards import (
     NoProgressGuard,
     validate_vla_semantics,
 )

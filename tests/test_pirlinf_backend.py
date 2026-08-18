@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from embodiedbench.planner.harness.pirlinf_backend import (
+from harness_vla.backends.pirlinf_backend import (
     PiRLinfBackendError,
     PiRLinfObservation,
     PiRLinfWebsocketBackend,

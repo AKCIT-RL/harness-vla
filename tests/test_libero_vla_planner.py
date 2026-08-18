@@ -1,6 +1,6 @@
 import pytest
 
-from embodiedbench.planner.harness.libero_vla_planner import (
+from harness_vla.planner.libero_vla_planner import (
     LiberoVLAPlanner,
     SYSTEM_PROMPT,
     parse_libero_vla_invocation,

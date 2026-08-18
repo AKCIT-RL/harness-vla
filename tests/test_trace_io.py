@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from embodiedbench.planner.harness.trace_io import (
+from harness_vla.trace_io import (
     append_jsonl_record,
     initialize_jsonl,
     load_complete_jsonl,

@@ -3,16 +3,16 @@
 import json
 from unittest.mock import patch
 
-from embodiedbench.planner.harness.global_memory import (
+from harness_vla.memory.global_memory import (
     GlobalMemory,
     SEED_FAILURE_MODELS,
     SEED_SUCCESS_RULES,
 )
-from embodiedbench.planner.harness.harness_planner import (
+from harness_vla.planner.harness_planner import (
     HarnessPlanner,
     extract_json_object,
 )
-from embodiedbench.planner.harness.prompts import build_turn_prompt
+from harness_vla.planner.prompts import build_turn_prompt
 
 
 # ---- GlobalMemory ----------------------------------------------------------
@@ -190,7 +190,7 @@ def test_planner_can_disable_ollama_thinking():
         client=_FakeClient("unused"),
     )
 
-    with patch("embodiedbench.planner.harness.harness_planner.request.urlopen", return_value=response) as urlopen:
+    with patch("harness_vla.planner.harness_planner.request.urlopen", return_value=response) as urlopen:
         invocation, raw = planner.act("x", {}, [0, 0, 0, 0, 0, 0, 1], [])
 
     assert invocation["action"] == "release"
@@ -221,7 +221,7 @@ def test_planner_can_enable_ollama_thinking():
         client=_FakeClient("unused"),
     )
 
-    with patch("embodiedbench.planner.harness.harness_planner.request.urlopen", return_value=response) as urlopen:
+    with patch("harness_vla.planner.harness_planner.request.urlopen", return_value=response) as urlopen:
         invocation, raw = planner.act("x", {}, [0, 0, 0, 0, 0, 0, 1], [])
 
     assert invocation["action"] == "release"

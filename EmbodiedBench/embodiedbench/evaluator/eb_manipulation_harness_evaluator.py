@@ -35,16 +35,16 @@ from embodiedbench.envs.eb_manipulation.rgbd_grounding import (
     compute_oracle_metrics,
     summarize_oracle_frames,
 )
-from embodiedbench.planner.harness.global_memory import (
+from harness_vla.memory.global_memory import (
     GlobalMemory,
     GlobalMemoryLedger,
 )
-from embodiedbench.planner.harness.harness_planner import HarnessPlanner
-from embodiedbench.planner.harness.task_memory import (
+from harness_vla.planner.harness_planner import HarnessPlanner
+from harness_vla.memory.task_memory import (
     load_task_memory,
     resolve_task_memory_commands,
 )
-from embodiedbench.planner.harness.trace_io import (
+from harness_vla.trace_io import (
     append_jsonl_record,
     initialize_jsonl,
     load_complete_jsonl,
@@ -52,11 +52,11 @@ from embodiedbench.planner.harness.trace_io import (
     summarize_trace_records,
     write_json_atomic,
 )
-from embodiedbench.planner.harness.evaluation_guards import (
+from harness_vla.evaluation_guards import (
     NoProgressGuard,
     validate_vla_semantics,
 )
-from embodiedbench.planner.harness.primitives import (
+from harness_vla.primitives.primitives import (
     PoseState,
     PrimitiveError,
     PrimitiveLibrary,
@@ -68,24 +68,24 @@ from embodiedbench.planner.harness.primitives import (
     reconcile_held_object,
     summarize_physical_state,
 )
-from embodiedbench.planner.harness.openvla_backend import (
+from harness_vla.backends.openvla_backend import (
     OpenVLABackendError,
     OpenVLAHTTPBackend,
     OpenVLAObservation,
     convert_libero_delta_to_eb,
 )
-from embodiedbench.planner.harness.pirlinf_backend import (
+from harness_vla.backends.pirlinf_backend import (
     PiRLinfBackendError,
     PiRLinfObservation,
     PiRLinfWebsocketBackend,
 )
-from embodiedbench.planner.harness.phase_policy import (
+from harness_vla.planner.phase_policy import (
     Phase,
     PhaseOperation,
     build_phase_manifest,
     validate_phase_manifest,
 )
-from embodiedbench.planner.harness.vla_runtime import VLARuntime
+from harness_vla.backends.vla_runtime import VLARuntime
 from embodiedbench.main import logger
 
 

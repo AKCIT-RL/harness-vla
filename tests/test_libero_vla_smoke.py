@@ -2,12 +2,12 @@ import json
 
 import numpy as np
 
-from embodiedbench.evaluator.libero_vla_smoke import (
+from harness_vla.eval.libero_vla_smoke import (
     LIBERO_DUMMY_ACTION,
     prepare_pirlinf_observation,
     run_libero_vla_smoke,
 )
-from embodiedbench.planner.harness.pirlinf_backend import PiRLinfChunk
+from harness_vla.backends.pirlinf_backend import PiRLinfChunk
 
 
 def _raw_observation(value=0):

@@ -3,24 +3,24 @@ import json
 import numpy as np
 import pytest
 
-from embodiedbench.evaluator.libero_analytic_executor import LiberoPrimitiveExecution
-from embodiedbench.evaluator.libero_memory_lifecycle import (
+from harness_vla.eval.libero_analytic_executor import LiberoPrimitiveExecution
+from harness_vla.eval.libero_memory_lifecycle import (
     bootstrap_memories,
     prepare_deployment,
     promote_global_memory,
 )
-from embodiedbench.evaluator.libero_multi_turn_evaluator import (
+from harness_vla.eval.libero_multi_turn_evaluator import (
     LiberoMultiTurnBudgets,
     LiberoVLAExecution,
 )
-from embodiedbench.evaluator.libero_multi_turn_run import (
+from harness_vla.eval.libero_multi_turn_run import (
     _visual_grounder,
     run_libero_multi_turn_episode,
 )
-from embodiedbench.evaluator.libero_native_multi_turn import LiberoNativeOffsets
-from embodiedbench.planner.harness.libero_visual_grounding import VisualPixelSelection
-from embodiedbench.planner.harness.phase_policy import build_phase_manifest
-from embodiedbench.planner.harness.trace_io import load_complete_jsonl
+from harness_vla.eval.libero_native_multi_turn import LiberoNativeOffsets
+from harness_vla.perception.libero_visual_grounding import VisualPixelSelection
+from harness_vla.planner.phase_policy import build_phase_manifest
+from harness_vla.trace_io import load_complete_jsonl
 
 
 TARGETS = ["bowl_1", "plate_1"]

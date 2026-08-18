@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 
-from embodiedbench.evaluator.libero_analytic_executor import (
+from harness_vla.eval.libero_analytic_executor import (
     execute_gripper_primitive,
     execute_pose_primitive,
     execute_release_primitive,
 )
-from embodiedbench.planner.harness.libero_primitives import LiberoPrimitiveError
+from harness_vla.primitives.libero_primitives import LiberoPrimitiveError
 
 
 class _FakeOscEnv:

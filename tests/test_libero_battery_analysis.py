@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from embodiedbench.evaluator.libero_battery_analysis import (
+from harness_vla.eval.libero_battery_analysis import (
     build_report,
     compute_grounding_stability,
     compute_latency_profile,

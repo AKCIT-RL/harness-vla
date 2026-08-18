@@ -6,7 +6,7 @@ import types
 from pathlib import Path
 from types import SimpleNamespace
 
-from embodiedbench.planner.harness.task_memory import build_task_memory
+from harness_vla.memory.task_memory import build_task_memory
 
 
 def _import_evaluator(monkeypatch):

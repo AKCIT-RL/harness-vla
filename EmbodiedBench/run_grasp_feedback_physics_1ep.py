@@ -22,7 +22,7 @@ from embodiedbench.envs.eb_manipulation.EBManEnv import EBManEnv
 from embodiedbench.envs.eb_manipulation.eb_man_utils import (
     form_harness_grounding_for_input,
 )
-from embodiedbench.planner.harness.primitives import (
+from harness_vla.primitives.primitives import (
     PoseState,
     PrimitiveLibrary,
     classify_grasp_outcome,

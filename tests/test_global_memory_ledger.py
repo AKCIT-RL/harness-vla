@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from embodiedbench.planner.harness.global_memory import (
+from harness_vla.memory.global_memory import (
     GlobalMemory,
     GlobalMemoryEvidence,
     GlobalMemoryLedger,

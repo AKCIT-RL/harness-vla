@@ -1,6 +1,6 @@
 import pytest
 
-from embodiedbench.planner.harness.libero_tau import (
+from harness_vla.primitives.libero_tau import (
     LiberoTauError,
     LiftAndGraspTau,
     read_bilateral_contact,

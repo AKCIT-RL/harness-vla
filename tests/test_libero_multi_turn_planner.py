@@ -1,6 +1,6 @@
 import pytest
 
-from embodiedbench.planner.harness.libero_multi_turn_planner import (
+from harness_vla.planner.libero_multi_turn_planner import (
     LiberoMultiTurnPlanner,
     MULTI_TURN_SYSTEM_PROMPT,
     parse_libero_multi_turn_invocation,

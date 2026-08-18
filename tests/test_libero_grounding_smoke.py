@@ -2,7 +2,7 @@ import json
 
 import numpy as np
 
-from embodiedbench.evaluator.libero_grounding_smoke import (
+from harness_vla.eval.libero_grounding_smoke import (
     LIBERO_GROUNDING_DUMMY_ACTION,
     run_libero_grounding_smoke,
 )

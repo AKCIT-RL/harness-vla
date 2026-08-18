@@ -5,7 +5,7 @@ import numpy as np
 from embodiedbench.evaluator.eb_navigation_harness_evaluator import (
     EB_NavigationHarnessEvaluator,
 )
-from embodiedbench.planner.harness.navigation_planner import (
+from harness_vla.planner.navigation_planner import (
     NAV_ACTION_TO_INDEX,
     clamp_navigation_steps,
     parse_navigation_invocation,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from embodiedbench.planner.harness.primitives import (
+from harness_vla.primitives.primitives import (
     GRIPPER_CLOSED,
     GRIPPER_OPEN,
     PoseState,

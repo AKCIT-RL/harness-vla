@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pytest
 
-from embodiedbench.evaluator.libero_native_multi_turn import (
+from harness_vla.eval.libero_native_multi_turn import (
     LiberoNativeExecutionState,
     LiberoNativeOffsets,
     make_native_move_executor,
@@ -12,8 +12,8 @@ from embodiedbench.evaluator.libero_native_multi_turn import (
     resolve_target_xyz,
     VisualLiftAndGraspMonitor,
 )
-from embodiedbench.planner.harness.libero_primitives import LiberoPrimitiveError
-from embodiedbench.planner.harness.pirlinf_backend import PiRLinfChunk
+from harness_vla.primitives.libero_primitives import LiberoPrimitiveError
+from harness_vla.backends.pirlinf_backend import PiRLinfChunk
 
 
 def _observation(step=0, xyz=(0.0, 0.0, 0.5)):

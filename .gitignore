@@ -242,3 +242,4 @@ github_cards/
 
 # Personal VS Code agent definitions (local only)
 .github/agents/
+docs/

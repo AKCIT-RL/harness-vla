@@ -3,19 +3,19 @@ import json
 import numpy as np
 import pytest
 
-from embodiedbench.evaluator.libero_analytic_executor import (
+from harness_vla.eval.libero_analytic_executor import (
     LiberoPrimitiveExecution,
 )
-from embodiedbench.evaluator.libero_multi_turn_evaluator import (
+from harness_vla.eval.libero_multi_turn_evaluator import (
     LiberoMultiTurnBudgets,
     LiberoVLAExecution,
 )
-from embodiedbench.evaluator.libero_multi_turn_run import (
+from harness_vla.eval.libero_multi_turn_run import (
     run_libero_multi_turn_episode,
 )
-from embodiedbench.evaluator.libero_native_multi_turn import LiberoNativeOffsets
-from embodiedbench.evaluator.libero_vla_smoke import LIBERO_DUMMY_ACTION
-from embodiedbench.planner.harness.trace_io import load_complete_jsonl
+from harness_vla.eval.libero_native_multi_turn import LiberoNativeOffsets
+from harness_vla.eval.libero_vla_smoke import LIBERO_DUMMY_ACTION
+from harness_vla.trace_io import load_complete_jsonl
 
 
 TARGET = "akita_black_bowl_1"

@@ -7,16 +7,16 @@ import time
 
 import pytest
 
-from embodiedbench.evaluator.libero_file_repl import (
+from harness_vla.eval.libero_file_repl import (
     LiberoFileProtocolError,
     LiberoFileREPL,
 )
-from embodiedbench.evaluator.libero_file_repl_bridge import (
+from harness_vla.eval.libero_file_repl_bridge import (
     LiberoFileREPLBridge,
     LiberoProtocolMetadata,
 )
-from embodiedbench.evaluator.libero_analytic_executor import LiberoPrimitiveExecution
-from embodiedbench.evaluator.libero_multi_turn_evaluator import LiberoVLAExecution
+from harness_vla.eval.libero_analytic_executor import LiberoPrimitiveExecution
+from harness_vla.eval.libero_multi_turn_evaluator import LiberoVLAExecution
 
 
 def _outcome(value, *, done=False):
@@ -72,7 +72,7 @@ def build():
         [
             sys.executable,
             "-m",
-            "embodiedbench.evaluator.libero_file_repl",
+            "harness_vla.eval.libero_file_repl",
             "--directory",
             str(protocol_directory),
             "--factory",
@@ -142,7 +142,7 @@ def test_crash_before_commit_can_execute_again_on_retry(tmp_path, monkeypatch):
     calls = []
     repl = LiberoFileREPL(tmp_path, lambda invocation: calls.append(invocation) or _outcome(3))
     repl.step({"name": "move"})
-    import embodiedbench.evaluator.libero_file_repl as module
+    import harness_vla.eval.libero_file_repl as module
 
     original = module.write_json_atomic
     crashed = False
@@ -169,7 +169,7 @@ def test_restart_repairs_metadata_after_committed_state_without_reexecution(
     calls = []
     repl = LiberoFileREPL(tmp_path, lambda invocation: calls.append(invocation) or _outcome(4))
     repl.step({"name": "move"})
-    import embodiedbench.evaluator.libero_file_repl as module
+    import harness_vla.eval.libero_file_repl as module
 
     original = module.write_text_atomic
 

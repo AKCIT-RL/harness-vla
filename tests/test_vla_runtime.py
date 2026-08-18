@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from embodiedbench.planner.harness import VLARuntime
+from harness_vla import VLARuntime
 
 
 @dataclass(frozen=True)

@@ -8,12 +8,12 @@ from tqdm import tqdm
 
 from embodiedbench.envs.eb_navigation.EBNavEnv import EBNavigationEnv, ValidEvalSets
 from embodiedbench.main import logger
-from embodiedbench.planner.harness.global_memory import GlobalMemory
-from embodiedbench.planner.harness.navigation_planner import (
+from harness_vla.memory.global_memory import GlobalMemory
+from harness_vla.planner.navigation_planner import (
     NAV_ACTION_TO_INDEX,
     NavigationHarnessPlanner,
 )
-from embodiedbench.planner.harness.trace_io import (
+from harness_vla.trace_io import (
     append_jsonl_record,
     initialize_jsonl,
     write_json_atomic,

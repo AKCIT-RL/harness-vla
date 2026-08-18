@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from embodiedbench.planner.harness.libero_grounding import (
+from harness_vla.perception.libero_grounding import (
     LiberoCameraCalibration,
     LiberoGroundingError,
     calibration_from_sim,

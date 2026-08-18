@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from embodiedbench.planner.harness.openvla_backend import (
+from harness_vla.backends.openvla_backend import (
     OpenVLABackendError,
     OpenVLAHTTPBackend,
     OpenVLAObservation,

@@ -26,6 +26,21 @@ Documentation:
 - [Development and evaluation practices](docs/HARNESS_VLA_BEST_PRACTICES.md)
 - [Immutable experiment reports](docs/runs)
 
+Repository layout:
+
+- `harness_vla/` — the agent: planner, primitive library, memories, perception,
+	VLA backends, and our LIBERO evaluation code (`harness_vla/eval/`);
+- `EmbodiedBench/` — vendored benchmark fork (environments only; the legacy
+	EB-Manipulation/Navigation harness evaluators remain wired into its hydra
+	pipeline);
+- `runners/` — entry-point scripts (e.g. `runners/run_libero_battery.py`);
+- `benchmarks/` — frozen evaluation protocols (never edited, only extended);
+- `scripts/queues/`, `scripts/analysis/` — evaluation queues and chart/metric
+	scripts;
+- `tests/` — unit and integration tests;
+- `evaluation_runs/` (gitignored) — run artifacts and traces.
+
+
 The next reproduction target is a native LIBERO Harness using the same frozen
 checkpoint in the direct-VLA baseline and the memory-guided Harness. EB-Navigation
 is treated separately as a beta-only generalization probe.

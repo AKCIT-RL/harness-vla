@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from embodiedbench.planner.harness.phase_policy import (
+from harness_vla.planner.phase_policy import (
     Phase,
     PhaseManifest,
     PhaseOperation,

@@ -1,6 +1,6 @@
 import pytest
 
-from embodiedbench.evaluator.libero_privileged_diagnostics import (
+from harness_vla.eval.libero_privileged_diagnostics import (
     LiberoPrivilegedDiagnostics,
 )
 

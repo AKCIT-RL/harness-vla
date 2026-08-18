@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from embodiedbench.planner.harness.global_memory import GlobalMemory
+from harness_vla.memory.global_memory import GlobalMemory
 
 
 @pytest.fixture

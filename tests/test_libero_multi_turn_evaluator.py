@@ -2,16 +2,16 @@ import json
 
 import pytest
 
-from embodiedbench.evaluator.libero_analytic_executor import (
+from harness_vla.eval.libero_analytic_executor import (
     LiberoPrimitiveExecution,
 )
-from embodiedbench.evaluator.libero_multi_turn_evaluator import (
+from harness_vla.eval.libero_multi_turn_evaluator import (
     LiberoMultiTurnBudgets,
     LiberoMultiTurnEvaluator,
     LiberoVLAExecution,
 )
-from embodiedbench.planner.harness.trace_io import load_complete_jsonl
-from embodiedbench.planner.harness.task_memory import build_task_memory
+from harness_vla.trace_io import load_complete_jsonl
+from harness_vla.memory.task_memory import build_task_memory
 
 
 TARGETS = ["akita_black_bowl_1", "plate_1"]

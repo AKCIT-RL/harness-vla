@@ -7,12 +7,12 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from embodiedbench.planner.harness.libero_grounding import (
+from harness_vla.perception.libero_grounding import (
     LiberoCameraCalibration,
     LiberoGroundingError,
 )
-from embodiedbench.planner.harness import libero_visual_grounding as visual
-from embodiedbench.planner.harness.libero_visual_grounding import (
+from harness_vla.perception import libero_visual_grounding as visual
+from harness_vla.perception.libero_visual_grounding import (
     OllamaVisualPixelLocator,
     VisualPixelObservation,
     VisualPixelSelection,

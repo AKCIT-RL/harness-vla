@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from embodiedbench.evaluator.libero_battery import (
+from harness_vla.eval.libero_battery import (
     aggregate_battery,
     episode_name,
     expand_protocol_matrix,

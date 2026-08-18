@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from embodiedbench.planner.harness.libero_primitives import (
+from harness_vla.primitives.libero_primitives import (
     LiberoPrimitiveError,
     compile_gripper_action,
     compile_move_action,

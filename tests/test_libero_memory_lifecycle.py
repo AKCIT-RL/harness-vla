@@ -2,12 +2,12 @@ import json
 
 import pytest
 
-from embodiedbench.evaluator.libero_memory_lifecycle import (
+from harness_vla.eval.libero_memory_lifecycle import (
     bootstrap_memories,
     prepare_deployment,
     promote_global_memory,
 )
-from embodiedbench.planner.harness.phase_policy import build_phase_manifest
+from harness_vla.planner.phase_policy import build_phase_manifest
 
 
 def _manifest(bootstrap_budget=8, deployment_budget=4):

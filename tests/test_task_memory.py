@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from embodiedbench.planner.harness.task_memory import (
+from harness_vla.memory.task_memory import (
     FORBIDDEN_OUTPUT_KEYS,
     build_task_memory,
     evaluate_memory_candidates,
@@ -13,7 +13,7 @@ from embodiedbench.planner.harness.task_memory import (
     resolve_task_memory_commands,
     validate_task_memory,
 )
-from embodiedbench.planner.harness.prompts import build_turn_prompt
+from harness_vla.planner.prompts import build_turn_prompt
 
 
 def _record(turn, invocation, primitive, contact=False):

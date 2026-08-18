@@ -8,8 +8,8 @@ history feedback) without launching CoppeliaSim/PyRep.
 
 import json
 
-from embodiedbench.planner.harness.harness_planner import HarnessPlanner
-from embodiedbench.planner.harness.primitives import (
+from harness_vla.planner.harness_planner import HarnessPlanner
+from harness_vla.primitives.primitives import (
     GRIPPER_CLOSED,
     GRIPPER_OPEN,
     PoseState,
