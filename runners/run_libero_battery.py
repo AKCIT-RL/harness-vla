@@ -78,6 +78,11 @@ def parse_args():
         default=None,
         help="Override the protocol planner.think value (beta-only ablation).",
     )
+    parser.add_argument(
+        "--planner-model",
+        default=None,
+        help="Override the protocol planner.model (beta-only ablation, e.g. planner size sweep).",
+    )
     return parser.parse_args()
 
 
@@ -129,7 +134,8 @@ def make_episode_runner(args, protocol):
                 if args.planner_think is not None:
                     think = args.planner_think == "on"
                 planner = LiberoMultiTurnPlanner(
-                    planner_config.get("model", "gemma4:12b"),
+                    args.planner_model
+                    or planner_config.get("model", "gemma4:12b"),
                     base_url=planner_config.get(
                         "base_url", "http://localhost:11434/v1"
                     ),
@@ -204,6 +210,11 @@ def main():
         datetime.now().strftime("%Y%m%d_%H%M%S"),
     )
     battery_root = args.output_root / battery_id
+    overrides = {}
+    if args.planner_think is not None:
+        overrides["planner_think"] = args.planner_think
+    if args.planner_model is not None:
+        overrides["planner_model"] = args.planner_model
     outcome = run_battery(
         protocol,
         battery_root=battery_root,
@@ -213,6 +224,7 @@ def main():
         include_hidden=args.include_hidden,
         hidden_only=args.hidden_only,
         resume=not args.no_resume,
+        overrides=overrides,
     )
     print(json.dumps(outcome["summary"], indent=2))
     print("ARTIFACTS: %s" % battery_root)

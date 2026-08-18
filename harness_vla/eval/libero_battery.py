@@ -161,6 +161,7 @@ def run_battery(
     include_hidden: bool = False,
     hidden_only: bool = False,
     resume: bool = True,
+    overrides: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run the full episode matrix sequentially and durably persist results.
 
@@ -189,6 +190,7 @@ def run_battery(
         "seeds": list(protocol["deployment_seeds"] if seeds is None else seeds),
         "include_hidden": bool(include_hidden),
         "hidden_only": bool(hidden_only),
+        "overrides": dict(overrides or {}),
         "episodes_planned": len(matrix),
         "git_commit": resolve_git_commit(Path(__file__)),
         "status": "in_progress",

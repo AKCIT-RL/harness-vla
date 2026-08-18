@@ -213,6 +213,27 @@ def test_run_battery_resumes_completed_episodes(tmp_path):
     assert outcome["summary"]["episodes_completed"] == 2
 
 
+def test_run_battery_records_overrides_in_manifest(tmp_path):
+    protocol = _protocol()
+    protocol["tasks"] = [protocol["tasks"][1]]
+    runner, _ = _fake_runner({(5, 0, 101): True, (5, 0, 102): True})
+    battery_root = tmp_path / "battery"
+    run_battery(
+        protocol,
+        battery_root=battery_root,
+        episode_runner=runner,
+        condition="harness",
+        overrides={"planner_model": "gemma4:4b", "planner_think": "off"},
+    )
+    manifest = json.loads(
+        (battery_root / "battery_manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest["overrides"] == {
+        "planner_model": "gemma4:4b",
+        "planner_think": "off",
+    }
+
+
 def test_repo_frozen_protocol_file_is_valid():
     from pathlib import Path
 
