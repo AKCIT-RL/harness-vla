@@ -24,10 +24,10 @@ def turns(battery):
             yield f, json.loads(line)
 
 # 1) success rates
-fig, ax = plt.subplots(figsize=(7, 4))
-suites = ["libero_spatial+object\n(frozen_v1, 24 ep)", "libero_goal+10\n(probe_v2, 8 ep)", "libero_90\n(probe_v3, 5 ep)"]
-baseline = [50.0, 25.0, 20.0]
-harness = [95.8, 75.0, 60.0]
+fig, ax = plt.subplots(figsize=(8, 4))
+suites = ["libero_spatial+object\n(frozen_v1, 24 ep)", "libero_goal+10\n(probe_v2, 8 ep)", "libero_90\n(probe_v3, 5 ep)", "HELD-OUT hidden tasks\n(first look, 8 ep)"]
+baseline = [50.0, 25.0, 20.0, 12.5]
+harness = [95.8, 75.0, 60.0, 75.0]
 x = range(len(suites))
 ax.bar([i - 0.2 for i in x], baseline, width=0.4, label="VLA-only baseline", color="#999")
 ax.bar([i + 0.2 for i in x], harness, width=0.4, label="Harness", color="#2b7bba")
