@@ -236,3 +236,9 @@ evaluation_runs/
 
 # OpenVLA checkpoint / CPU eval artifacts (16 GB model weights, never vendor)
 openvla_cpu_eval/
+
+# GitHub cards workspace (never committed: drafts, charts, videos for PR/issue comments)
+github_cards/
+
+# Personal VS Code agent definitions (local only)
+.github/agents/
