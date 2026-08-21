@@ -170,6 +170,8 @@ class LiberoMultiTurnPlanner(LiberoVLAPlanner):
     """Ollama planner that receives semantic state and emits one primitive."""
 
     _chat_attempts = 3
+    _parse_retries = 2
+    last_parse_retries = 0
 
     def _chat(self, user_prompt: str) -> str:
         import time
@@ -244,6 +246,27 @@ class LiberoMultiTurnPlanner(LiberoVLAPlanner):
             available_targets=available_targets,
             max_chunks_cap=max_chunks_cap,
         )
+        # Beta-only: re-prompt on invalid output so schema slips (common in
+        # small planners) do not abort the episode; same policy for all models.
+        retries = 0
+        while invocation is None and retries < self._parse_retries:
+            retries += 1
+            retry_prompt = user_prompt + (
+                "\nYour previous reply was rejected as an invalid invocation:\n"
+                "%s\n"
+                "Reply again with exactly one JSON object following the schema."
+                " Pick exactly one allowed literal per field (for example"
+                ' "mode" is either "above" or "release_pose", never'
+                ' "above|release_pose"), use only grounded target names, and'
+                " add no extra fields." % raw_output
+            )
+            raw_output = self._chat(retry_prompt)
+            invocation = parse_libero_multi_turn_invocation(
+                raw_output,
+                available_targets=available_targets,
+                max_chunks_cap=max_chunks_cap,
+            )
+        self.last_parse_retries = retries
         return invocation, raw_output
 
 

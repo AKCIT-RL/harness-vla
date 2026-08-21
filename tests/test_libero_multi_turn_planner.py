@@ -112,6 +112,36 @@ def test_parser_rejects_invalid_caps(cap):
         )
 
 
+def test_planner_reprompts_once_on_invalid_output_and_records_retries():
+    class FakePlanner(LiberoMultiTurnPlanner):
+        replies = [
+            '```json\n{"action":"move_to","target":"plate_1",'
+            '"mode":"above|release_pose","gripper":"close"}\n```',
+            '{"action":"move_to","target":"plate_1","mode":"above",'
+            '"gripper":"close"}',
+        ]
+
+        def _chat(self, user_prompt):
+            self.prompts = getattr(self, "prompts", []) + [user_prompt]
+            return self.replies[len(self.prompts) - 1]
+
+    planner = FakePlanner("gemma-test", think=False)
+    invocation, raw = planner.act_turn(
+        "place the bowl on the plate",
+        {"holding": None, "last_action": None, "last_feedback": None,
+         "budget": {"turns_remaining": 2, "actions_remaining": 30}},
+        available_targets=TARGETS,
+        max_chunks_cap=4,
+    )
+    assert invocation == {
+        "action": "move_to", "target": "plate_1",
+        "mode": "above", "gripper": "close",
+    }
+    assert planner.last_parse_retries == 1
+    assert "rejected as an invalid invocation" in planner.prompts[1]
+    assert "above|release_pose" in planner.prompts[1]
+
+
 def test_planner_turn_contains_semantic_state_without_pose_or_oracle():
     class FakePlanner(LiberoMultiTurnPlanner):
         def _chat(self, user_prompt):
