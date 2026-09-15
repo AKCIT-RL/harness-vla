@@ -4,8 +4,8 @@
 
 defaults:
   - /examples/two_robot_planner_demo_config
-  - override /planner@evaluation.agents.agent_0.planner: harness_bridge_planner
-  - override /planner@evaluation.agents.agent_1.planner: harness_bridge_planner
+  - override /planner@evaluation.agents.agent_0.planner: harness_random_planner
+  - override /planner@evaluation.agents.agent_1.planner: harness_random_planner
   - override /agent@evaluation.agents.agent_0.config: oracle_rearrange_agent_motortoolsonly
   - override /agent@evaluation.agents.agent_1.config: oracle_rearrange_agent_motortoolsonly
 

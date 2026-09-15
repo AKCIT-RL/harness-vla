@@ -1,5 +1,7 @@
 """Example harness that reacts to non-privileged failure signals.
 
+Classification: beta-only (smoke baseline; no LLM).
+
 Demonstrates the recovery hooks enabled by ``StepContext.signals``:
 - ``skill_failure_loop``: stop retrying the failing target (blacklist it);
 - ``duplicate_subtask``: skip work the partner already finished.
@@ -8,12 +10,13 @@ Demonstrates the recovery hooks enabled by ``StepContext.signals``:
 from typing import Optional, Set
 
 from partnr_harness.contracts import (
+    DUPLICATE_SUBTASK,
+    SKILL_FAILURE_LOOP,
     Decision,
     DoneDecision,
     StepContext,
     ToolCall,
 )
-from partnr_harness.signals import DUPLICATE_SUBTASK, SKILL_FAILURE_LOOP
 
 from harness_vla.envs.partnr.baselines.random_harness import RandomHarness
 

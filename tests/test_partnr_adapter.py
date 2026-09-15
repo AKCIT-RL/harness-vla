@@ -4,7 +4,15 @@ import json
 
 import pytest
 
-from partnr_harness.contracts import ActionResult, DoneDecision, StepContext, ToolCall, ToolSpec
+from partnr_harness.contracts import (
+    ActionResult,
+    DoneDecision,
+    EpisodeContext,
+    EpisodeSummary,
+    StepContext,
+    ToolCall,
+    ToolSpec,
+)
 
 from harness_vla.envs.partnr.adapter import PartnrHarnessAdapter
 from harness_vla.envs.partnr.prompts import build_partnr_turn_prompt, step_context_to_dict
@@ -112,3 +120,47 @@ def test_full_history_in_prompt_with_max_history_zero(monkeypatch, adapter):
     # The prompt sent on turn 5 (index 4) carried the full transcript of turns 1-4.
     assert "4. Navigate[room_3] -> success" in adapter.last_prompt
     assert "Navigate[room_4]" not in adapter.last_prompt
+
+
+# ------------------------------------------------------ bootstrap label
+
+def _run_success_episode(monkeypatch, adapter):
+    adapter.on_episode_start(EpisodeContext("11", "Move the cup to the table", 0, tools=TOOLS))
+    for i, action in enumerate(["Navigate[table]", "Pick[cup]"]):
+        _mock_llm(monkeypatch, adapter, [json.dumps({"thought": "x", "action": action})])
+        adapter.decide(_ctx(i))
+        adapter.on_action_result(
+            ActionResult(tool=action.split("[")[0], args="", response="Successful execution!", success_hint=True)
+        )
+
+
+def _summary(**extras):
+    return EpisodeSummary(episode_id="11", num_decisions=2, emitted_done=True, extras=extras)
+
+
+def test_bootstrap_promotes_only_with_env_label_and_success(monkeypatch, tmp_path):
+    adapter = PartnrHarnessAdapter(zero_shot=False, task_memory_dir=str(tmp_path), phase="bootstrap")
+    _run_success_episode(monkeypatch, adapter)
+    # No label published by the env (expose_bootstrap_label off) -> nothing written.
+    adapter.on_episode_end(_summary(decisions_total=2))
+    assert list(tmp_path.glob("*.json")) == []
+    # Legacy key alone is no longer a channel.
+    adapter.on_episode_end(_summary(task_state_success=1.0))
+    assert list(tmp_path.glob("*.json")) == []
+    # Explicit label, failure -> nothing.
+    adapter.on_episode_end(_summary(bootstrap_label={"task_state_success": 0.0, "source": "official_stats"}))
+    assert list(tmp_path.glob("*.json")) == []
+    # Explicit label, success -> task memory written with provenance.
+    adapter.on_episode_end(_summary(bootstrap_label={"task_state_success": 1.0, "source": "official_stats"}))
+    files = list(tmp_path.glob("*.json"))
+    assert len(files) == 1
+    entry = json.loads(files[0].read_text())
+    assert entry["sources"][0]["label_source"] == "official_stats"
+    assert entry["sources"][0]["episode_id"] == "11"
+
+
+def test_deployment_ignores_bootstrap_label(monkeypatch, tmp_path):
+    adapter = PartnrHarnessAdapter(zero_shot=False, task_memory_dir=str(tmp_path), phase="deployment")
+    _run_success_episode(monkeypatch, adapter)
+    adapter.on_episode_end(_summary(bootstrap_label={"task_state_success": 1.0, "source": "official_stats"}))
+    assert list(tmp_path.glob("*.json")) == []

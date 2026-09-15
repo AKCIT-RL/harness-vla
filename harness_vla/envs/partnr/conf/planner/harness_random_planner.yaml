@@ -1,0 +1,17 @@
+_target_: 'partnr_harness.bridge_planner.HarnessBridgePlanner'
+_recursive_: False
+_partial_: True
+
+# LLM-free smoke harness (explores random rooms, then Done).
+plan_config:
+  max_decisions: 50
+  enable_signals: True
+  action_history_window: 5
+  log_decisions: True
+  max_consecutive_llm_failures: 10
+  symmetric_partner_snapshot: True
+  expose_bootstrap_label: False
+  harness:
+    _target_: 'harness_vla.envs.partnr.baselines.random_harness.RandomHarness'
+    max_decisions_before_done: 6
+    seed: 0

@@ -1,8 +1,14 @@
-"""ReAct baseline as an ``AgentHarness`` (beta-only reimplementation).
+"""ReAct baseline as an ``AgentHarness``.
 
-Mirrors the PARTNR zero-shot ReAct planner (``habitat_llm.planner.
-zero_shot_react_planner`` + ``conf/instruct/zero_shot_prompt.yaml``, kept
-upstream untouched as the reference) on top of the environment contract:
+Classification: **beta-only**. This is a re-implementation of the PARTNR
+zero-shot ReAct procedure over the ``AgentHarness`` interface, NOT the upstream
+planner (``habitat_llm.planner.zero_shot_react_planner`` +
+``conf/instruct/zero_shot_prompt.yaml`` stay untouched as the reference and
+are selected by the ``*_react_ollama`` baselines). Use this one when the
+comparison must hold the env bridge, transport and sampling knobs fixed and
+vary only the decision procedure.
+
+Procedure:
 
 * prompt = role/system text, task, world description, tool list with
   descriptions, ``Thought: ... / <Action[args]> / Assigned!`` output format;
@@ -16,14 +22,14 @@ Differences from upstream, on purpose: the world description is refreshed
 every turn (upstream sends it once and appends ``Objects:`` updates), and the
 transport is the same OpenAI-compatible/Ollama client used by the other
 harnesses so sampling/seeding/thinking flags stay comparable. No
-``habitat_llm`` import.
+``habitat_llm`` import; only ``partnr_harness.contracts``.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from partnr_harness.contracts import (
     ActionResult,
@@ -149,6 +155,7 @@ class ReActHarness(AgentHarness):
         world_char_budget: int = 12000,
         max_transcript_chars: int = 0,
         system_prompt: str = SYSTEM_PROMPT,
+        chat_fn: Optional[Callable[[List[Dict[str, str]]], str]] = None,
         **kwargs: Any,
     ) -> None:
         if kwargs:
@@ -156,6 +163,10 @@ class ReActHarness(AgentHarness):
         self.world_char_budget = int(world_char_budget)
         self.max_transcript_chars = int(max_transcript_chars)
         self.system_prompt_text = system_prompt
+        # Transport shared with the other harnesses (seeding, thinking
+        # fallback, retries). ``chat_fn`` replaces it in tests: it receives the
+        # chat messages and returns the raw completion text.
+        self._chat_fn = chat_fn
         self._llm = LLMPrefixHarness(
             prefix=system_prompt,
             base_url=base_url,
@@ -254,6 +265,16 @@ class ReActHarness(AgentHarness):
 
     # --------------------------------------------------------------- decide
 
+    def _chat(self, messages: List[Dict[str, str]]) -> str:
+        if self._chat_fn is not None:
+            self._llm.last_meta = {}
+            try:
+                return str(self._chat_fn(messages))
+            except Exception as error:  # noqa: BLE001 - surfaced as llm_failure
+                self._llm.last_meta = {"llm_failure": True, "llm_error": str(error)}
+                return ""
+        return self._llm._post(messages)
+
     def decide(self, context: StepContext) -> Decision:
         if not self._tools:
             self._tools = list(context.tools)
@@ -271,7 +292,7 @@ class ReActHarness(AgentHarness):
         attempts = 0
         for attempt in range(2):
             attempts = attempt + 1
-            raw = self._llm._post(messages)
+            raw = self._chat(messages)
             meta = dict(self._llm.last_meta)
             if meta.get("llm_failure"):
                 self.last_meta = meta

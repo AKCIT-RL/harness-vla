@@ -13,7 +13,7 @@ plan_config:
   symmetric_partner_snapshot: True
   harness:
     _target_: 'partnr_harness.external.ExternalLoopHarness'
-    agent_target: 'partnr_harness.external.RandomLoopAgent'
+    agent_target: 'harness_vla.envs.partnr.baselines.random_loop.RandomLoopAgent'
     agent_kwargs:
       max_steps: 6
       seed: 0

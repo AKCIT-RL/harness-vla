@@ -7,7 +7,7 @@ StepContext incl. ``extras.state``; ``decision``: ToolCall/DoneDecision),
 ``result`` (``result``: ActionResult with ``success_hint``), ``llm_failure`` and
 ``episode_end`` (``summary``: EpisodeSummary). The official
 ``task_state_success`` is not part of the harness JSONL by default; the env
-exposes it only as ``summary.extras.bootstrap_label`` (``{"task_success",
+exposes it only as ``summary.extras.bootstrap_label`` (``{"task_state_success",
 "source": "official_stats"}``) when ``plan_config.expose_bootstrap_label`` is
 on (bootstrap phase). Old logs with ``task_state_success`` on the
 ``episode_end`` record or in ``extras`` are still understood, as are explicit
@@ -126,14 +126,26 @@ def episode_id_of(records: Sequence[Mapping]) -> str:
 
 def bootstrap_label(summary: Any) -> Optional[Dict[str, Any]]:
     """``{"task_success": bool, "source": str}`` from an EpisodeSummary (or its
-    dict form), or ``None`` when the env did not expose the label."""
+    dict form), or ``None`` when the env did not expose the label.
+
+    The env publishes ``extras["bootstrap_label"] = {"task_state_success":
+    float, "source": "official_stats"}`` only under
+    ``plan_config.expose_bootstrap_label``; a boolean ``task_success`` form is
+    accepted too.
+    """
     extras = getattr(summary, "extras", None)
     if extras is None and isinstance(summary, Mapping):
         extras = summary.get("extras")
     label = (extras or {}).get("bootstrap_label")
-    if not isinstance(label, Mapping) or "task_success" not in label:
+    if not isinstance(label, Mapping):
         return None
-    return {"task_success": bool(label["task_success"]), "source": str(label.get("source", ""))}
+    if label.get("task_state_success") is not None:
+        success = float(label["task_state_success"]) == 1.0
+    elif "task_success" in label:
+        success = bool(label["task_success"])
+    else:
+        return None
+    return {"task_success": success, "source": str(label.get("source", ""))}
 
 
 def episode_success(episode: Mapping) -> Optional[bool]:
