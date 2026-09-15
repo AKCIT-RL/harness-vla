@@ -182,6 +182,39 @@ def episode_transcript(records: Sequence[Mapping]) -> List[Dict[str, Any]]:
     return transcript
 
 
+def symbolic_steps(records: Sequence[Mapping]) -> List[Dict[str, Any]]:
+    """Normalized, instance-free steps for ``memory.global_memory_extractor``."""
+    steps: List[Dict[str, Any]] = []
+    for index, step in enumerate(episode_transcript(records)):
+        vocab = step.get("vocab") or {}
+        parsed = parse_action(step["action"])
+        instances = {
+            arg for arg in (parsed[1] if parsed else [])
+            if instance_category(arg) is not None
+        }
+        decision_index = step.get("decision_index")
+        error = step.get("failure_kind") or step.get("error_kind")
+        ok = step.get("ok")
+        if step.get("error_kind"):
+            ok = False
+        elif step.get("status") is None and step["name"] != "Done":
+            ok = None
+        steps.append({
+            "turn": int(decision_index) + 1 if isinstance(decision_index, int) else index + 1,
+            "action": symbolize_partnr_action(
+                step["action"],
+                objects=vocab.get("objects", ()),
+                furniture=vocab.get("furniture", ()),
+                rooms=vocab.get("rooms", ()),
+            ),
+            "primitive": str(step["name"]),
+            "ok": ok,
+            "error": None if ok else error,
+            "instances": instances,
+        })
+    return steps
+
+
 # ------------------------------------------------------------- task memory
 
 def skeleton_from_transcript(transcript: Sequence[Mapping]) -> List[str]:
