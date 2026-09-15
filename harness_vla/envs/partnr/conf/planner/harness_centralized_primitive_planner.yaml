@@ -1,0 +1,27 @@
+_target_: 'partnr_harness.centralized_planner.CentralizedHarnessPlanner'
+_recursive_: False
+_partial_: True
+
+plan_config:
+  max_decisions: 100
+  enable_signals: True
+  action_history_window: 5
+  log_decisions: True
+  max_consecutive_llm_failures: 10
+  harness:
+    _target_: 'harness_vla.envs.partnr.legacy.centralized_primitive_harness.CentralizedPrimitiveHarness'
+    use_claims: True
+    prefix: 'You are a central controller for a household task. You command TWO agents: agent_0 is a Spot robot and agent_1 is a human. You act through atomic primitives, one action per agent per turn.'
+    base_url: 'http://localhost:11435/v1'
+    model: ${model_pool.model}
+    temperature: ${model_pool.temperature}
+    repeat_penalty: ${model_pool.repeat_penalty}
+    repeat_last_n: ${model_pool.repeat_last_n}
+    thinking_budget: ${model_pool.thinking_budget}
+    max_tokens: ${model_pool.max_tokens}
+    timeout_s: 240
+    world_char_budget: 12000
+    enable_thinking: ${model_pool.enable_thinking}
+    disable_thinking: ${model_pool.disable_thinking}
+    num_ctx: ${model_pool.num_ctx}
+    max_retries: 3

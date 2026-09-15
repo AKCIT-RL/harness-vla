@@ -1,0 +1,11 @@
+model: 'gemma4:12b'
+enable_thinking: True
+disable_thinking: False
+# Ablation cell: identical to gemma4_12b_on but with the streamed thinking
+# budget halved (1024 tokens).
+num_ctx: 16384
+max_tokens: 4096
+temperature: 0.6
+repeat_penalty: 1.2
+repeat_last_n: 256
+thinking_budget: 1024

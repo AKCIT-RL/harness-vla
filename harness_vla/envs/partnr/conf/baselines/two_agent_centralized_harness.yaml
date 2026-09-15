@@ -1,0 +1,20 @@
+# @package _global_
+# Centralized two-agent pilot (human + robot): ONE primitive harness instance
+# controls BOTH agents through a single LLM (model_pool). Full observability,
+# videos enabled.
+#
+# Classification: beta-only (PARTNR adaptation; no Harness VLA fidelity claim).
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - /model_pool: gemma4_12b_off_4k
+  - override /evaluation: centralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.planner: harness_centralized_primitive_planner
+  - override /agent@evaluation.agents.agent_0.config: harness_primitive_agent
+  - override /agent@evaluation.agents.agent_1.config: harness_primitive_agent
+
+world_model:
+  partial_obs: False
+
+evaluation:
+  save_video: True

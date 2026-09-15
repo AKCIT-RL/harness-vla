@@ -13,11 +13,10 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from omegaconf import DictConfig
 
-from habitat_llm.llm.base_llm import BaseLLM, Prompt
 from harness_vla.envs.partnr.legacy.ollama_chat import (
     MAX_RETRY_BACKOFF_S,
     base_seed_from_env,
@@ -25,8 +24,14 @@ from harness_vla.envs.partnr.legacy.ollama_chat import (
     chat_with_thinking_fallback,
 )
 
+# Structural stand-in for ``habitat_llm.llm.base_llm.Prompt``; the simulator
+# side only duck-types ``generate()``, so no ``habitat_llm`` import is needed.
+Prompt = Union[str, List[Any]]
 
-class OpenAICompatChat(BaseLLM):
+
+class OpenAICompatChat:
+    """Drop-in for ``habitat_llm.llm.base_llm.BaseLLM`` (same ``generate`` API)."""
+
     def __init__(self, conf: DictConfig):
         self.llm_conf = conf
         self.generation_params = conf.generation_params

@@ -1,0 +1,21 @@
+# @package _global_
+# Two-agent pilot (human + robot): BOTH agents driven by the primitive-action
+# harness (atomic tools only), each with its OWN HarnessBridgePlanner instance.
+# Full observability, videos enabled. Same LLM (model_pool) serves both agents.
+#
+# Classification: beta-only (PARTNR adaptation; no Harness VLA fidelity claim).
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - /model_pool: gemma4_12b_off_4k
+  - override /evaluation: decentralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.agents.agent_0.planner: harness_primitive_planner
+  - override /planner@evaluation.agents.agent_1.planner: harness_primitive_planner
+  - override /agent@evaluation.agents.agent_0.config: harness_primitive_agent
+  - override /agent@evaluation.agents.agent_1.config: harness_primitive_agent
+
+world_model:
+  partial_obs: False
+
+evaluation:
+  save_video: True

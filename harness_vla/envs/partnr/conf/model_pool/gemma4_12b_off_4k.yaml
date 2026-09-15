@@ -1,0 +1,15 @@
+model: 'gemma4:12b'
+enable_thinking: False
+disable_thinking: True
+num_ctx: 8192
+# Thinking disabled for the two-agent harness: gemma4:12b thinking runs away
+# (loops/deliberation) and always fills the whole num_predict budget, leaving
+# content empty -> parse_error. Without thinking, the JSON action is emitted
+# immediately. 4096 gives comfortable room for the per-agent action object.
+max_tokens: 4096
+# Sampling: 0.6 with per-episode seeds (PARTNR_LLM_SEED) instead of greedy
+# decoding, which degenerates into repetition loops.
+temperature: 0.6
+repeat_penalty: 1.0
+repeat_last_n: 64
+thinking_budget: 0  # 0 = no budget (thinking off)

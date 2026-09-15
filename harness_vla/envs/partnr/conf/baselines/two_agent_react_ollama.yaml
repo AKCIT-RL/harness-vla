@@ -1,0 +1,38 @@
+# @package _global_
+# Two-agent ReAct baseline (human + robot) via Ollama, for comparison with the
+# centralized harness. Each agent runs the native zero-shot ReAct planner with
+# the shared model_pool (gemma4:12b, thinking off), full observability, videos.
+#
+# Classification: beta-only (standard-algorithm baseline).
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - /model_pool: gemma4_12b_off_4k
+  - override /evaluation: decentralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.agents.agent_0.planner: llm_zero_shot_react_planner
+  - override /planner@evaluation.agents.agent_1.planner: llm_zero_shot_react_planner
+  - override /instruct@evaluation.agents.agent_0.planner.plan_config.instruct: zero_shot_prompt
+  - override /instruct@evaluation.agents.agent_1.planner.plan_config.instruct: zero_shot_prompt
+  - override /llm@evaluation.agents.agent_0.planner.plan_config.llm: ollama_chat
+  - override /llm@evaluation.agents.agent_1.planner.plan_config.llm: ollama_chat
+  - override /agent@evaluation.agents.agent_0.config: oracle_rearrange_agent_motortoolsonly
+  - override /agent@evaluation.agents.agent_1.config: oracle_rearrange_object_states_agent_motortoolsonly
+
+world_model:
+  partial_obs: False
+
+evaluation:
+  save_video: True
+  agents:
+    agent_0:
+      planner:
+        plan_config:
+          constrained_generation: False
+          objects_response: True
+          replanning_threshold: 50
+    agent_1:
+      planner:
+        plan_config:
+          constrained_generation: False
+          objects_response: True
+          replanning_threshold: 50

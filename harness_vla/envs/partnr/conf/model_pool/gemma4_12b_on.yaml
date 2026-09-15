@@ -1,0 +1,15 @@
+model: 'gemma4:12b'
+enable_thinking: True
+disable_thinking: False
+# Thinking shares num_predict with the answer. At temperature 0 the thinking
+# loops (same sentence repeated) until the budget is gone -> done_reason=length,
+# empty content. Layered fix: temperature 0.6 + repeat penalty over a longer
+# window, streamed thinking capped at thinking_budget tokens (and aborted on
+# repetition loops), then a thinking-OFF retry. num_ctx 16384 keeps prompt +
+# thinking + answer inside the context window.
+num_ctx: 16384
+max_tokens: 4096
+temperature: 0.6
+repeat_penalty: 1.2
+repeat_last_n: 256
+thinking_budget: 2048

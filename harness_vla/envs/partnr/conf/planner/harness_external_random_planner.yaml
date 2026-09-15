@@ -1,0 +1,20 @@
+_target_: 'partnr_harness.bridge_planner.HarnessBridgePlanner'
+_recursive_: False
+_partial_: True
+
+# Smoke of the inverted-control env API: the agent drives reset()/step() from
+# a thread; no LLM involved.
+plan_config:
+  max_decisions: 8
+  enable_signals: True
+  action_history_window: 5
+  log_decisions: True
+  max_consecutive_llm_failures: 10
+  symmetric_partner_snapshot: True
+  harness:
+    _target_: 'partnr_harness.external.ExternalLoopHarness'
+    agent_target: 'partnr_harness.external.RandomLoopAgent'
+    agent_kwargs:
+      max_steps: 6
+      seed: 0
+    decision_timeout_s: 600

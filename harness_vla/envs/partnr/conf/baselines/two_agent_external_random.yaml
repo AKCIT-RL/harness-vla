@@ -1,0 +1,20 @@
+# @package _global_
+# Two-agent smoke (human + robot): BOTH agents driven by an external loop
+# agent (RandomLoopAgent) through the ALFWorld-style env API. No LLM.
+# Full observability, no videos. model_pool is unused but kept so the queue
+# runner can pass `model_pool=<profile>` uniformly.
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - /model_pool: gemma4_12b_off_4k
+  - override /evaluation: decentralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.agents.agent_0.planner: harness_external_random_planner
+  - override /planner@evaluation.agents.agent_1.planner: harness_external_random_planner
+  - override /agent@evaluation.agents.agent_0.config: harness_primitive_agent
+  - override /agent@evaluation.agents.agent_1.config: harness_primitive_agent
+
+world_model:
+  partial_obs: False
+
+evaluation:
+  save_video: False

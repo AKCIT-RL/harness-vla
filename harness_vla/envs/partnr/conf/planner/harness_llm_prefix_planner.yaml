@@ -1,0 +1,24 @@
+_target_: 'partnr_harness.bridge_planner.HarnessBridgePlanner'
+_recursive_: False
+_partial_: True
+
+plan_config:
+  max_decisions: 30
+  enable_signals: True
+  action_history_window: 5
+  log_decisions: True
+  max_consecutive_llm_failures: 10
+  harness:
+    _target_: 'harness_vla.envs.partnr.legacy.llm_prefix_harness.LLMPrefixHarness'
+    prefix: 'You are a robot collaborating on a household task.'
+    base_url: 'http://192.168.1.227:8000/v1'
+    model: 'Qwen/Qwen2.5-7B-Instruct'
+    # Literal values: this planner is composed without a model_pool profile
+    # (vLLM endpoint), so ${model_pool.*} would not resolve.
+    temperature: 0.6
+    repeat_penalty: 1.0
+    repeat_last_n: 64
+    thinking_budget: 0
+    max_tokens: 64
+    # vLLM na spark serve Qwen2.5-7B com max_model_len=8192
+    world_char_budget: 12000

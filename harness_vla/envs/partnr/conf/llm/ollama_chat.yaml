@@ -1,0 +1,36 @@
+llm:
+  _target_    : harness_vla.envs.partnr.legacy.llm_client.OpenAICompatChat
+  _partial_   : True
+
+verbose       : False
+
+system_message : 'You are an expert at task planning.'
+
+# Plain-text prompt composition: no model-specific tags.
+system_tag : ""
+user_tag : ""
+assistant_tag : ""
+eot_tag : ""
+
+keep_message_history : False
+
+base_url : 'http://localhost:11435/v1'
+request_timeout : 240
+max_retries : 3
+strip_arg_quotes : True
+enable_thinking : ${model_pool.enable_thinking}
+disable_thinking : ${model_pool.disable_thinking}
+num_ctx : ${model_pool.num_ctx}
+repeat_penalty : ${model_pool.repeat_penalty}
+repeat_last_n : ${model_pool.repeat_last_n}
+thinking_budget : ${model_pool.thinking_budget}
+
+generation_params:
+  model         : ${model_pool.model}
+  max_tokens    : ${model_pool.max_tokens}
+  temperature   : ${model_pool.temperature}
+  top_p         : 1
+  stream        : False
+  stop          : "\n"
+  frequency_penalty : 0
+  presence_penalty  : 0

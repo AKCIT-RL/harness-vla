@@ -6,10 +6,12 @@ the bridge planner): one JSON record per line with ``type`` in
 StepContext incl. ``extras.state``; ``decision``: ToolCall/DoneDecision),
 ``result`` (``result``: ActionResult with ``success_hint``), ``llm_failure`` and
 ``episode_end`` (``summary``: EpisodeSummary). The official
-``task_state_success`` is not part of the harness JSONL; it is read from
-``summary.extras.task_state_success`` when the env puts it there, from a
-top-level ``task_state_success`` on the ``episode_end`` record, or from an
-explicit per-episode override supplied by the caller.
+``task_state_success`` is not part of the harness JSONL by default; the env
+exposes it only as ``summary.extras.bootstrap_label`` (``{"task_success",
+"source": "official_stats"}``) when ``plan_config.expose_bootstrap_label`` is
+on (bootstrap phase). Old logs with ``task_state_success`` on the
+``episode_end`` record or in ``extras`` are still understood, as are explicit
+per-episode overrides supplied by the caller.
 
 Classification:
 
@@ -122,8 +124,24 @@ def episode_id_of(records: Sequence[Mapping]) -> str:
     return ""
 
 
+def bootstrap_label(summary: Any) -> Optional[Dict[str, Any]]:
+    """``{"task_success": bool, "source": str}`` from an EpisodeSummary (or its
+    dict form), or ``None`` when the env did not expose the label."""
+    extras = getattr(summary, "extras", None)
+    if extras is None and isinstance(summary, Mapping):
+        extras = summary.get("extras")
+    label = (extras or {}).get("bootstrap_label")
+    if not isinstance(label, Mapping) or "task_success" not in label:
+        return None
+    return {"task_success": bool(label["task_success"]), "source": str(label.get("source", ""))}
+
+
 def episode_success(episode: Mapping) -> Optional[bool]:
-    """Official success of an episode, or ``None`` when unknown."""
+    """Official success of an episode, or ``None`` when unknown.
+
+    Reads ``summary.extras.bootstrap_label`` (current env channel); the
+    ``task_state_success`` forms are kept for old logs and caller overrides.
+    """
     if episode.get("task_state_success") is not None:
         return float(episode["task_state_success"]) == 1.0
     for record in episode.get("records", []):
@@ -131,6 +149,9 @@ def episode_success(episode: Mapping) -> Optional[bool]:
             continue
         if record.get("task_state_success") is not None:
             return float(record["task_state_success"]) == 1.0
+        label = bootstrap_label(record.get("summary") or {})
+        if label is not None:
+            return label["task_success"]
         extras = (record.get("summary") or {}).get("extras") or {}
         if extras.get("task_state_success") is not None:
             return float(extras["task_state_success"]) == 1.0

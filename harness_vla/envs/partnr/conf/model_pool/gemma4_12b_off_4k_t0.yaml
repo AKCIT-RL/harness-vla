@@ -1,0 +1,11 @@
+model: 'gemma4:12b'
+enable_thinking: False
+disable_thinking: True
+num_ctx: 8192
+# Ablation cell: identical to gemma4_12b_off_4k but greedy decoding
+# (temperature 0.0) to measure the effect of sampling at 0.6.
+max_tokens: 4096
+temperature: 0.0
+repeat_penalty: 1.0
+repeat_last_n: 64
+thinking_budget: 0  # 0 = no budget (thinking off)

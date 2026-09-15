@@ -29,6 +29,7 @@ from partnr_harness.contracts import (
 
 from harness_vla.envs.partnr.legacy.primitive_harness import PrimitiveHarness
 from harness_vla.envs.partnr.memory import (
+    bootstrap_label,
     load_partnr_task_memory,
     partnr_global_memory,
     promote_transcript_to_task_memory,
@@ -164,15 +165,17 @@ class PartnrHarnessAdapter(AgentHarness):
     def on_episode_end(self, summary: EpisodeSummary) -> None:
         if self.phase != Phase.BOOTSTRAP or not self.task_memory_dir or self._episode is None:
             return
-        success = (summary.extras or {}).get("task_state_success")
-        if success is None or float(success) != 1.0:
+        # Privileged channel: the env only fills ``bootstrap_label`` when its
+        # ``expose_bootstrap_label`` flag is on; deployment never reads it.
+        label = bootstrap_label(summary)
+        if label is None or not label.get("task_success"):
             return
         try:
             promote_transcript_to_task_memory(
                 self.task_memory_dir,
                 self._episode.instruction,
                 self.history,
-                source={"episode_id": summary.episode_id},
+                source={"episode_id": summary.episode_id, "label_source": label.get("source")},
             )
         except (OSError, ValueError):
             _LOG.warning("task memory promotion failed", exc_info=True)

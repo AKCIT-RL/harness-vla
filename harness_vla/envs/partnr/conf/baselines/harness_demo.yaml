@@ -1,0 +1,17 @@
+# @package _global_
+# Phase-1 smoke baseline: standard human+robot embodiments, both agents driven
+# by the external-harness bridge (RandomHarness). No LLM required.
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - override /evaluation: decentralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.agents.agent_0.planner: harness_bridge_planner
+  - override /planner@evaluation.agents.agent_1.planner: harness_bridge_planner
+  - override /agent@evaluation.agents.agent_0.config: oracle_rearrange_agent_motortoolsonly
+  - override /agent@evaluation.agents.agent_1.config: oracle_rearrange_object_states_agent_motortoolsonly
+
+world_model:
+  partial_obs: True
+
+evaluation:
+  save_video: False
