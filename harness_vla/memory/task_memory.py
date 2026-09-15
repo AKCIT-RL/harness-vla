@@ -1,10 +1,15 @@
-"""Offline, symbolic Task Specific Memory generation for verified rollouts."""
+"""Offline, symbolic Task Specific Memory generation for verified rollouts.
+
+The module-level defaults (``FORBIDDEN_OUTPUT_KEYS``, ``symbolize_record``)
+encode the LIBERO/EB-Manipulation trace schema; environment adapters may pass
+their own ``forbidden_output_keys=`` / ``symbolize=`` without changing them.
+"""
 
 import hashlib
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from harness_vla.trace_io import (
     load_complete_jsonl,
@@ -112,18 +117,21 @@ def symbolize_record(record):
     return command
 
 
-def _contains_forbidden_key(value):
+def _contains_forbidden_key(value, forbidden_output_keys=None):
+    forbidden = (
+        FORBIDDEN_OUTPUT_KEYS if forbidden_output_keys is None else forbidden_output_keys
+    )
     if isinstance(value, dict):
         return any(
-            key in FORBIDDEN_OUTPUT_KEYS or _contains_forbidden_key(child)
+            key in forbidden or _contains_forbidden_key(child, forbidden)
             for key, child in value.items()
         )
     if isinstance(value, list):
-        return any(_contains_forbidden_key(child) for child in value)
+        return any(_contains_forbidden_key(child, forbidden) for child in value)
     return False
 
 
-def validate_task_memory(audit, commands):
+def validate_task_memory(audit, commands, forbidden_output_keys=None):
     """Reject malformed or spatially contaminated memory payloads."""
     if not isinstance(audit, dict) or audit.get("schema_version") != 1:
         raise ValueError("unsupported audit schema")
@@ -131,7 +139,9 @@ def validate_task_memory(audit, commands):
         raise ValueError("invalid memory classification")
     if audit.get("command_count") != len(commands):
         raise ValueError("command count does not match payload")
-    if _contains_forbidden_key(audit) or _contains_forbidden_key(commands):
+    if _contains_forbidden_key(audit, forbidden_output_keys) or _contains_forbidden_key(
+        commands, forbidden_output_keys
+    ):
         raise ValueError("forbidden spatial data")
     for expected_sequence, command in enumerate(commands, 1):
         if not isinstance(command, dict) or set(command) - COMMAND_KEYS:
@@ -218,9 +228,10 @@ def resolve_task_memory_commands(
     object_coords: Mapping[str, Sequence[float]],
     object_labels: Mapping[str, str],
     object_roles: Mapping[str, Sequence[str]],
+    forbidden_output_keys=None,
 ) -> Tuple[Dict, ...]:
     """Resolve symbolic bindings against current grounding without mutating memory."""
-    if _contains_forbidden_key(commands):
+    if _contains_forbidden_key(commands, forbidden_output_keys):
         raise ValueError("seed commands contain forbidden spatial data")
     resolved_commands = []
     for command in commands:
@@ -248,8 +259,20 @@ def resolve_task_memory_commands(
     return tuple(resolved_commands)
 
 
-def build_task_memory(records, episode_result, trace_complete=True):
-    """Build memory only from a fully verified successful rollout."""
+def build_task_memory(
+    records,
+    episode_result,
+    trace_complete=True,
+    *,
+    symbolize: Callable[[Dict], Dict] = None,
+    forbidden_output_keys=None,
+):
+    """Build memory only from a fully verified successful rollout.
+
+    ``symbolize`` maps one executed record to a coordinate-free command
+    (defaults to the LIBERO ``symbolize_record``).
+    """
+    symbolize = symbolize_record if symbolize is None else symbolize
     action_records = [
         record for record in records
         if record.get("status") != "initialization_reset"
@@ -285,7 +308,7 @@ def build_task_memory(records, episode_result, trace_complete=True):
     if not reasons:
         try:
             for sequence, record in enumerate(executed, 1):
-                command = symbolize_record(record)
+                command = symbolize(record)
                 command["sequence"] = sequence
                 commands.append(command)
         except ValueError as error:
@@ -319,7 +342,7 @@ def build_task_memory(records, episode_result, trace_complete=True):
         "command_count": len(commands),
     }
     try:
-        validate_task_memory(audit, commands)
+        validate_task_memory(audit, commands, forbidden_output_keys)
     except ValueError as error:
         return TaskMemoryDecision(False, (str(error),))
     return TaskMemoryDecision(True, (), audit=audit, commands=tuple(commands))

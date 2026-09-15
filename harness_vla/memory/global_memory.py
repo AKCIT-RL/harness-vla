@@ -5,6 +5,10 @@ primitive library: reusable success rules and failure models (e.g. empty grasp,
 false visual success). Rules can be seeded manually or promoted explicitly from
 trace-backed candidates. Task Specific Memory and the bootstrap/deployment
 lifecycle are implemented separately in ``libero_memory_lifecycle.py``.
+
+The module-level defaults (seed rules, ``PRIMITIVE_NAMES``, trace provenance
+validator) are the LIBERO ones. Environment adapters pass ``primitive_names=``
+and ``provenance_validator=`` to reuse the ledger/promotion policy unchanged.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ import os
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 from harness_vla.primitives.primitives import PRIMITIVE_NAMES
 from harness_vla.trace_io import (
@@ -103,6 +107,8 @@ class GlobalMemory:
         *,
         include_seed: bool = True,
         base_memory: Optional["GlobalMemory"] = None,
+        primitive_names: Optional[Sequence[str]] = None,
+        provenance_validator: Optional[Callable[["GlobalMemoryEvidence"], None]] = None,
     ) -> "GlobalMemory":
         """Render only promoted ledger entries, optionally after a seed/base."""
         base = base_memory or cls.seeded()
@@ -110,7 +116,12 @@ class GlobalMemory:
             success_rules=list(base.success_rules) if include_seed else [],
             failure_models=list(base.failure_models) if include_seed else [],
         )
-        ledger = GlobalMemoryLedger.load(ledger_path, read_only=True)
+        ledger = GlobalMemoryLedger.load(
+            ledger_path,
+            read_only=True,
+            primitive_names=primitive_names,
+            provenance_validator=provenance_validator,
+        )
         content = {
             "success_rule": memory.success_rules,
             "failure_model": memory.failure_models,
@@ -288,11 +299,14 @@ def _candidate_from_dict(item: dict) -> GlobalMemoryEvidence:
 
 
 def _decide_candidate(
-    candidate: GlobalMemoryEvidence, semantic_interpretation: str = ""
+    candidate: GlobalMemoryEvidence,
+    semantic_interpretation: str = "",
+    primitive_names: Optional[Sequence[str]] = None,
 ) -> GlobalMemoryDecision:
+    known = PRIMITIVE_NAMES if primitive_names is None else primitive_names
     if not candidate.trace_path or not candidate.primitive or not candidate.structured_evidence:
         return GlobalMemoryDecision(candidate, "rejected", "incomplete provenance")
-    if candidate.primitive not in PRIMITIVE_NAMES:
+    if candidate.primitive not in known:
         return GlobalMemoryDecision(candidate, "rejected", "unknown primitive")
     if candidate.postcondition_met is None:
         return GlobalMemoryDecision(candidate, "pending", "ambiguous postcondition")
@@ -356,6 +370,11 @@ def _validate_candidate_provenance(candidate: GlobalMemoryEvidence) -> None:
             raise ValueError("Global Memory structured evidence mismatch")
 
 
+def validate_trace_hash_provenance(candidate: GlobalMemoryEvidence) -> None:
+    """Environment-agnostic provenance: the referenced trace exists and matches its hash."""
+    _trace_records_for_candidate(candidate)
+
+
 @dataclass
 class GlobalMemoryLedger:
     """Persist trace-backed candidates and explicit promotion decisions."""
@@ -363,12 +382,37 @@ class GlobalMemoryLedger:
     evidence: List[GlobalMemoryEvidence] = field(default_factory=list)
     decisions: List[GlobalMemoryDecision] = field(default_factory=list)
     read_only: bool = False
+    primitive_names: Optional[Sequence[str]] = field(default=None, repr=False, compare=False)
+    provenance_validator: Optional[Callable[[GlobalMemoryEvidence], None]] = field(
+        default=None, repr=False, compare=False
+    )
+
+    def _decide(
+        self, candidate: GlobalMemoryEvidence, semantic_interpretation: str = ""
+    ) -> GlobalMemoryDecision:
+        return _decide_candidate(candidate, semantic_interpretation, self.primitive_names)
+
+    def _validate_provenance(self, candidate: GlobalMemoryEvidence) -> None:
+        validator = self.provenance_validator or _validate_candidate_provenance
+        validator(candidate)
 
     @classmethod
-    def load(cls, path: str, *, read_only: bool = False) -> "GlobalMemoryLedger":
+    def load(
+        cls,
+        path: str,
+        *,
+        read_only: bool = False,
+        primitive_names: Optional[Sequence[str]] = None,
+        provenance_validator: Optional[Callable[[GlobalMemoryEvidence], None]] = None,
+    ) -> "GlobalMemoryLedger":
+        ledger = cls(
+            read_only=read_only,
+            primitive_names=primitive_names,
+            provenance_validator=provenance_validator,
+        )
         ledger_path = Path(path)
         if not ledger_path.exists():
-            return cls(read_only=read_only)
+            return ledger
         data = json.loads(ledger_path.read_text(encoding="utf-8"))
         schema_version = data.get("schema_version", 1)
         if type(schema_version) is not int or schema_version not in {1, 2, 3}:
@@ -377,11 +421,11 @@ class GlobalMemoryLedger:
             decisions = []
             for item in data.get("entries", []):
                 candidate = _candidate_from_dict(item["candidate"])
-                _validate_candidate_provenance(candidate)
+                ledger._validate_provenance(candidate)
                 interpretation = item.get("semantic_interpretation", "")
                 if not isinstance(interpretation, str):
                     raise ValueError("semantic interpretation must be a string")
-                decision = _decide_candidate(candidate, interpretation)
+                decision = ledger._decide(candidate, interpretation)
                 if (
                     item.get("status"),
                     item.get("reason"),
@@ -398,11 +442,13 @@ class GlobalMemoryLedger:
             evidence = [item.candidate for item in decisions]
         else:
             evidence = [_candidate_from_dict(item) for item in data.get("evidence", [])]
-            decisions = [_decide_candidate(item) for item in evidence]
+            decisions = [ledger._decide(item) for item in evidence]
             for candidate in evidence:
                 if candidate.trace_path:
-                    _validate_candidate_provenance(candidate)
-        return cls(evidence=evidence, decisions=decisions, read_only=read_only)
+                    ledger._validate_provenance(candidate)
+        ledger.evidence = evidence
+        ledger.decisions = decisions
+        return ledger
 
     def add(self, candidate: GlobalMemoryEvidence) -> bool:
         if self.read_only:
@@ -411,7 +457,7 @@ class GlobalMemoryLedger:
             return False
         self.evidence.append(candidate)
         self.evidence.sort(key=lambda item: item.identity)
-        self.decisions.append(_decide_candidate(candidate))
+        self.decisions.append(self._decide(candidate))
         self.decisions.sort(key=lambda item: item.candidate.identity)
         return True
 
@@ -432,7 +478,7 @@ class GlobalMemoryLedger:
         for index, decision in enumerate(self.decisions):
             if decision.candidate.identity != candidate_id:
                 continue
-            promoted = _decide_candidate(decision.candidate, semantic_interpretation)
+            promoted = self._decide(decision.candidate, semantic_interpretation)
             if promoted.status != "promoted":
                 raise ValueError(
                     "candidate provenance does not permit explicit promotion"
