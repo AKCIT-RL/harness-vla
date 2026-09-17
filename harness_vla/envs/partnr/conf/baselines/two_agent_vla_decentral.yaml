@@ -1,0 +1,20 @@
+# @package _global_
+# Two-agent (human + robot): each agent has its OWN Harness VLA brain
+# (harness_vla.envs.partnr.decentralized.HarnessVlaDecentralized) behind its
+# own HarnessBridgePlanner; coordination only through published transcripts.
+# Full observability, no videos.
+
+defaults:
+  - /examples/planner_multi_agent_demo_config
+  - /model_pool: gemma4_12b_off_4k
+  - override /evaluation: decentralized_evaluation_runner_multi_agent
+  - override /planner@evaluation.agents.agent_0.planner: harness_vla_decentral
+  - override /planner@evaluation.agents.agent_1.planner: harness_vla_decentral
+  - override /agent@evaluation.agents.agent_0.config: harness_primitive_agent
+  - override /agent@evaluation.agents.agent_1.config: harness_primitive_agent
+
+world_model:
+  partial_obs: False
+
+evaluation:
+  save_video: False

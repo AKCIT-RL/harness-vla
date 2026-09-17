@@ -1,13 +1,18 @@
 """PARTNR (Habitat 3) agent side.
 
-The environment (bridge planner, tools, official metrics) lives in the
-``partnr-harness`` superproject and defines the ``AgentHarness`` contract in
-``partnr_harness.contracts``. This package implements the agent:
+The environment (bridge/centralized planners, tools, official metrics) lives
+in the ``partnr-harness`` superproject and defines the ``AgentHarness``
+contract in ``partnr_harness.contracts``. This package implements the agent:
 
-* ``primitives`` — PARTNR primitive vocabulary and instance-id symbolization;
-* ``prompts`` — system/turn prompts with full-episode history;
+* ``primitives`` — PARTNR primitive vocabulary, JSON/bracket codec and
+  instance-id symbolization;
+* ``prompts`` — system/turn prompts (team transcript, memory, JSON output);
 * ``memory`` — PARTNR Task Memory and Global Memory (paper-compatible);
-* ``adapter`` — ``PartnrHarnessAdapter(AgentHarness)``;
+* ``llm_client`` — stdlib LLM transport (Ollama native / OpenAI-compatible);
+* ``agent`` — ``HarnessVlaCentralized(AgentHarness)``: one brain, all agents;
+* ``decentralized`` — ``HarnessVlaDecentralized``: one brain per agent,
+  coordination through published transcripts;
 * ``lifecycle`` — offline bootstrap -> frozen deployment helpers;
-* ``legacy`` — beta-only historical prompt harnesses (equivalence control).
+* ``react_llm`` — OpenAI-compatible client for the upstream ReAct baseline;
+* ``baselines`` — LLM-free smoke client for the inverted-control env API.
 """

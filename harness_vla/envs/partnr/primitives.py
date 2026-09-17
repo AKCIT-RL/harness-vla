@@ -8,10 +8,9 @@ suffix and tags the entity kind.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
-
-from harness_vla.envs.partnr.legacy.primitive_harness import extract_json_object
 
 __all__ = [
     "PARTNR_PRIMITIVE_NAMES",
@@ -46,6 +45,70 @@ _LITERAL_ARGS = {"on", "within", "next_to", "none", ""}
 _BRACKET_CALL = re.compile(r"([A-Za-z_]+)\s*\[([^\]]*)\]", re.DOTALL)
 _INSTANCE = re.compile(r"^(?P<category>[A-Za-z][A-Za-z_\-]*?)_(?P<index>\d+)$")
 _SYMBOL = re.compile(r"^<(?P<kind>obj|furn|room|ent):(?P<category>[^>]+)>$")
+_UNICODE_BRACKETS = str.maketrans({"【": "{", "】": "}", "［": "[", "］": "]"})
+
+
+# ------------------------------------------------------------- json codec
+
+def extract_json_object(text: str) -> Optional[dict]:
+    """Best-effort extraction of a single JSON object from model output."""
+    if not text:
+        return None
+    cleaned = text.strip().translate(_UNICODE_BRACKETS)
+    fence = re.search(r"```(?:json)?\s*(.*?)```", cleaned, re.DOTALL)
+    if fence:
+        cleaned = fence.group(1).strip()
+
+    candidates = [cleaned]
+    brace = first_balanced_object(cleaned)
+    if brace is not None:
+        candidates.append(brace)
+
+    for cand in candidates:
+        for attempt in (cand, _strip_trailing_commas(cand)):
+            try:
+                obj = json.loads(attempt)
+                if isinstance(obj, dict):
+                    return obj
+            except (json.JSONDecodeError, TypeError):
+                continue
+    return None
+
+
+def first_balanced_object(text: str) -> Optional[str]:
+    """Substring of the first ``{...}`` with balanced braces (string-aware)."""
+    start = text.find("{")
+    if start == -1:
+        return None
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _strip_trailing_commas(text: str) -> str:
+    return re.sub(r",(\s*[}\]])", r"\1", text)
+
+
+# ----------------------------------------------------------- bracket codec
 
 
 def format_action(name: str, args: Sequence[str] | str | None) -> str:

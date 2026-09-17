@@ -1,5 +1,5 @@
 llm:
-  _target_    : harness_vla.envs.partnr.legacy.llm_client.OpenAICompatChat
+  _target_    : harness_vla.envs.partnr.react_llm.OpenAICompatChat
   _partial_   : True
 
 verbose       : False

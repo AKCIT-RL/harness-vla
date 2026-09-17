@@ -2,9 +2,10 @@ _target_: 'partnr_harness.bridge_planner.HarnessBridgePlanner'
 _recursive_: False
 _partial_: True
 
-# ReAct re-implemented over AgentHarness (beta-only): Thought/Action format,
-# FULL episode transcript in every prompt, same Ollama transport/knobs as the
-# other harnesses so the comparison isolates the decision procedure.
+# Harness VLA decentralized brain: one instance PER agent behind its own
+# bridge planner. Individual Task/Global Memory (<dir>/<agent_label>/) and
+# partner awareness through published transcripts (actions + results only)
+# under shared_memory_dir/<episode_id>/<agent_label>.jsonl.
 plan_config:
   max_decisions: 50
   enable_signals: True
@@ -14,7 +15,8 @@ plan_config:
   symmetric_partner_snapshot: True
   expose_bootstrap_label: False
   harness:
-    _target_: 'harness_vla.envs.partnr.baselines.react.ReActHarness'
+    _target_: 'harness_vla.envs.partnr.decentralized.HarnessVlaDecentralized'
+    shared_memory_dir: ${hydra:runtime.output_dir}/memory
     base_url: 'http://localhost:11435/v1'
     model: ${model_pool.model}
     temperature: ${model_pool.temperature}
@@ -28,5 +30,8 @@ plan_config:
     disable_thinking: ${model_pool.disable_thinking}
     num_ctx: ${model_pool.num_ctx}
     max_retries: 3
-    # 0 = no cap on the accumulated transcript (ReAct property under test).
-    max_transcript_chars: 0
+    max_history: 0
+    zero_shot: True
+    phase: deployment
+    task_memory_dir: null
+    global_memory_path: null

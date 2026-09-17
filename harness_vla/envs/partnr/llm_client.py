@@ -1,7 +1,18 @@
-"""beta-only: historical PARTNR prompt harness, kept for equivalence control; not the paper harness.
+"""LLM transport for the PARTNR Harness VLA agents (stdlib only).
 
-Native Ollama chat transport with beta-only inference instrumentation.
+Two backends behind one :class:`LLMClient`:
+
+* **Ollama native** (``/api/chat``) when either thinking flag is set: exposes
+  ``num_ctx``, ``think``, seeds and per-call inference metadata (tokens,
+  durations, thinking fallback);
+* **OpenAI-compatible** (``/v1/chat/completions``) otherwise.
+
+Seeding: the queue runner exports ``PARTNR_LLM_SEED`` per episode; every call
+gets ``base + call_index (+ 100000 * agent_uid)`` so repeated runs are
+reproducible and the two decentralized agents never share a seed.
 """
+
+from __future__ import annotations
 
 import json
 import os
@@ -12,7 +23,18 @@ import urllib.request
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+__all__ = [
+    "ANSWER_RESERVE_TOKENS",
+    "LLMClient",
+    "base_seed_from_env",
+    "chat_ollama",
+    "chat_with_thinking_fallback",
+    "ollama_api_base",
+    "thinking_repetition_ratio",
+]
+
 _SEED_ENV = "PARTNR_LLM_SEED"
+_AGENT_SEED_STRIDE = 100_000
 
 # Tokens kept for the answer after the thinking budget when capping num_predict.
 ANSWER_RESERVE_TOKENS = 512
@@ -48,6 +70,8 @@ def thinking_repetition_ratio(thinking: str) -> float:
     return 1.0 - len(set(lines)) / len(lines)
 
 
+# ------------------------------------------------------------ ollama native
+
 def chat_ollama(
     *,
     base_url: str,
@@ -70,20 +94,14 @@ def chat_ollama(
 ) -> Tuple[str, Dict[str, Any]]:
     """Call ``/api/chat`` and return action content plus separate metadata.
 
-    Beta-only: the stream is never aborted by closing the connection. On
-    Ollama 0.33.x a client disconnect mid-generation leaves the server in a
-    state where subsequent requests hang and fail with 500 "client closing the
-    connection" without reaching llama-server; ~10 such aborts wedged a queue
-    job for hours. Instead, when ``think=True`` and ``thinking_budget > 0`` the
-    budget is enforced server-side via ``options.num_predict =
-    min(max_tokens, thinking_budget + ANSWER_RESERVE_TOKENS)`` and the stream
-    is always read until ``done: true`` (or the socket timeout).
-
-    ``aborted_reason`` is kept in the metadata as a label derived from the
-    finished result: ``"thinking_budget"`` when the generation hit the length
-    cap with no usable content, ``"thinking_loop"`` when the thinking text is
-    highly repetitive. ``content_done`` is accepted for API compatibility and
-    ignored (the model is allowed to finish on its own).
+    The stream is never aborted by closing the connection (Ollama 0.33.x
+    wedges after mid-generation disconnects). With ``think=True`` and
+    ``thinking_budget > 0`` the budget is enforced server-side via
+    ``options.num_predict = min(max_tokens, thinking_budget +
+    ANSWER_RESERVE_TOKENS)`` and the stream is read until ``done: true``.
+    ``aborted_reason`` is a post-hoc label (``thinking_budget`` when the
+    length cap hit with no usable content, ``thinking_loop`` when the thinking
+    text is highly repetitive). ``content_done`` is accepted and ignored.
     """
     num_predict = max_tokens
     if think and thinking_budget > 0:
@@ -300,31 +318,203 @@ def _content_usable(content: str) -> bool:
     return True
 
 
-def _consume_stream(response) -> Tuple[str, str, Dict[str, Any]]:
-    """Accumulate NDJSON deltas until ``done: true`` (or EOF/timeout).
-
-    Never breaks out early: the connection must stay open until the server
-    finishes, see ``chat_ollama``.
-    """
+def _consume_stream(response: Any) -> Tuple[str, str, Dict[str, Any]]:
+    """Read an NDJSON ``/api/chat`` stream to the end; returns (thinking, content, last_body)."""
     thinking_parts: List[str] = []
     content_parts: List[str] = []
-    last_chunk: Dict[str, Any] = {}
+    body: Dict[str, Any] = {}
     for raw_line in response:
-        line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
-        line = line.strip()
+        line = raw_line.decode("utf-8").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
         if not line:
             continue
-        chunk = json.loads(line)
-        last_chunk = chunk
+        try:
+            chunk = json.loads(line)
+        except json.JSONDecodeError:
+            continue
         message = chunk.get("message") or {}
         if message.get("thinking"):
             thinking_parts.append(str(message["thinking"]))
         if message.get("content"):
             content_parts.append(str(message["content"]))
+        body = chunk
         if chunk.get("done"):
             break
-    return "".join(thinking_parts), "".join(content_parts), last_chunk
+    return "".join(thinking_parts), "".join(content_parts), body
 
 
 def _nanoseconds_to_seconds(value: Any) -> Optional[float]:
-    return float(value) / 1_000_000_000 if value is not None else None
+    if value is None:
+        return None
+    try:
+        return float(value) / 1e9
+    except (TypeError, ValueError):
+        return None
+
+
+# ------------------------------------------------------------------ client
+
+class LLMClient:
+    """One chat completion per call; failures are reported, never raised.
+
+    ``post(messages)`` returns the content string and fills ``last_meta``;
+    on transport exhaustion / empty content ``last_meta["llm_failure"]`` is
+    True so callers turn it into an ``error_kind="llm_failure"`` decision.
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:11435/v1",
+        model: str = "gemma4:12b",
+        api_key: Optional[str] = None,
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+        timeout_s: float = 240.0,
+        enable_thinking: bool = False,
+        disable_thinking: bool = False,
+        num_ctx: Optional[int] = None,
+        max_retries: int = 3,
+        repeat_penalty: float = 1.0,
+        repeat_last_n: int = 64,
+        thinking_budget: int = 0,
+    ) -> None:
+        if enable_thinking and disable_thinking:
+            raise ValueError("enable_thinking and disable_thinking are mutually exclusive")
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.api_key = api_key
+        self.temperature = float(temperature)
+        self.max_tokens = int(max_tokens)
+        self.timeout_s = float(timeout_s)
+        self.enable_thinking = bool(enable_thinking)
+        self.disable_thinking = bool(disable_thinking)
+        self.num_ctx = num_ctx
+        self.max_retries = int(max_retries)
+        self.repeat_penalty = repeat_penalty
+        self.repeat_last_n = repeat_last_n
+        self.thinking_budget = int(thinking_budget)
+        self.last_meta: Dict[str, Any] = {}
+        self._base_seed = base_seed_from_env()
+        self._call_index = 0
+        self._agent_uid: Optional[int] = None
+
+    @property
+    def native(self) -> bool:
+        return self.enable_thinking or self.disable_thinking
+
+    def start_episode(self, agent_uid: Optional[int] = None) -> None:
+        """Re-read the per-episode seed and restart the call counter."""
+        self._base_seed = base_seed_from_env()
+        self._call_index = 0
+        self._agent_uid = agent_uid
+
+    def next_seed(self) -> Optional[int]:
+        index = self._call_index
+        self._call_index += 1
+        if self._base_seed is None:
+            return None
+        seed = self._base_seed + index
+        if self._agent_uid is not None:
+            seed += _AGENT_SEED_STRIDE * self._agent_uid
+        return seed
+
+    def post(
+        self,
+        messages: List[Dict[str, str]],
+        *,
+        stop: Optional[List[str]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        self.last_meta = {}
+        max_tokens = int(max_tokens) if max_tokens else self.max_tokens
+        if self.native:
+            return self._post_native(messages, stop, max_tokens)
+        return self._post_openai(messages, stop, max_tokens)
+
+    def _post_native(
+        self, messages: List[Dict[str, str]], stop: Optional[List[str]], max_tokens: int
+    ) -> str:
+        common = dict(
+            base_url=self.base_url,
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+            max_tokens=max_tokens,
+            timeout_s=self.timeout_s,
+            num_ctx=self.num_ctx,
+            max_retries=self.max_retries,
+            stop=stop,
+            repeat_penalty=self.repeat_penalty,
+            repeat_last_n=self.repeat_last_n,
+        )
+        try:
+            if self.enable_thinking:
+                content, self.last_meta = chat_with_thinking_fallback(
+                    seed=self.next_seed(), thinking_budget=self.thinking_budget, **common
+                )
+            else:
+                content, self.last_meta = chat_ollama(
+                    think=False, stream=False, seed=self.next_seed(), **common
+                )
+        except Exception as error:  # transport exhausted its retries
+            self.last_meta = {"llm_failure": True, "llm_error": str(error)}
+            return ""
+        if not content.strip():
+            self.last_meta["llm_failure"] = True
+            self.last_meta["llm_error"] = "empty_content"
+        return content
+
+    def _post_openai(
+        self, messages: List[Dict[str, str]], stop: Optional[List[str]], max_tokens: int
+    ) -> str:
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
+        if stop:
+            payload["stop"] = list(stop)
+        seed = self.next_seed()
+        if seed is not None:
+            payload["seed"] = seed
+        request = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        if self.api_key:
+            request.add_header("Authorization", f"Bearer {self.api_key}")
+        started = time.monotonic()
+        last_error: Exception = RuntimeError("no attempt made")
+        for attempt in range(self.max_retries):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+                    body = json.loads(response.read().decode())
+                break
+            except (json.JSONDecodeError, socket.timeout, urllib.error.URLError, OSError) as error:
+                last_error = error
+                if attempt + 1 < self.max_retries:
+                    time.sleep(min(float(2**attempt), MAX_RETRY_BACKOFF_S))
+        else:
+            self.last_meta = {"llm_failure": True, "llm_error": str(last_error)}
+            return ""
+        try:
+            content = str(body["choices"][0]["message"]["content"] or "")
+        except (KeyError, IndexError, TypeError) as error:
+            self.last_meta = {"llm_failure": True, "llm_error": f"malformed response: {error!r}"}
+            return ""
+        usage = body.get("usage") or {}
+        self.last_meta = {
+            "backend": "openai_compat",
+            "model": body.get("model") or self.model,
+            "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+            "completion_tokens": int(usage.get("completion_tokens") or 0),
+            "total_tokens": int(usage.get("total_tokens") or 0),
+            "request_duration_s": time.monotonic() - started,
+            "sampling": {"temperature": self.temperature, "seed": seed, "max_tokens": max_tokens},
+        }
+        if not content.strip():
+            self.last_meta["llm_failure"] = True
+            self.last_meta["llm_error"] = "empty_content"
+        return content

@@ -1,10 +1,7 @@
-"""PARTNR agent baselines (beta-only) implementing ``partnr_harness.contracts.AgentHarness``.
+"""PARTNR LLM-free smoke agent for the inverted-control env API.
 
-* ``random_harness`` / ``recovery_aware`` — LLM-free smoke harnesses;
-* ``random_loop`` — LLM-free client for the inverted-control env API;
-* ``react`` — ReAct reimplementation (full transcript, Thought/Action format).
+* ``random_loop`` — drives ``reset``/``step`` of a ``PartnrEnvClient``
+  (duck-typed from ``partnr_harness.external``) with random valid tools.
 
-Nothing here imports ``habitat_llm``; only the contract types and constants
-from ``partnr_harness.contracts`` (``random_loop`` duck-types
-``partnr_harness.external.PartnrEnvClient``).
+Nothing here imports ``habitat_llm``.
 """

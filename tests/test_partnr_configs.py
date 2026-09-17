@@ -1,7 +1,4 @@
-"""Composition checks for the agent-side Hydra configs (OmegaConf only, no Hydra runtime).
-
-Moved from ``partnr_harness/tests`` when the agent configs left the env repo.
-"""
+"""Composition checks for the agent-side Hydra configs (OmegaConf only, no Hydra runtime)."""
 
 from pathlib import Path
 
@@ -10,6 +7,7 @@ from omegaconf import OmegaConf
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "harness_vla" / "envs" / "partnr" / "conf"
 BRIDGE = "partnr_harness.bridge_planner.HarnessBridgePlanner"
+CENTRAL = "partnr_harness.centralized_planner.CentralizedHarnessPlanner"
 
 PROFILES = {
     "gemma4_12b_off": ("gemma4:12b", False, True),
@@ -18,10 +16,16 @@ PROFILES = {
     "gemma3_1b_off": ("gemma3:1b", False, True),
 }
 CONTROLLERS = {
-    "planner/harness_primitive_planner": "plan_config.harness",
-    "planner/harness_react_planner": "plan_config.harness",
+    "planner/harness_vla_central": "plan_config.harness",
+    "planner/harness_vla_decentral": "plan_config.harness",
     "llm/ollama_chat": "",
 }
+LLM_KNOBS = (
+    "base_url", "model", "temperature", "repeat_penalty", "repeat_last_n", "thinking_budget",
+    "max_tokens", "timeout_s", "world_char_budget", "enable_thinking", "disable_thinking",
+    "num_ctx", "max_retries", "max_history", "zero_shot", "phase", "task_memory_dir",
+    "global_memory_path",
+)
 
 
 def _baseline(name):
@@ -32,9 +36,12 @@ def _baseline(name):
 def _planner(name, profile="gemma4_12b_off_4k"):
     planner = OmegaConf.load(CONFIG_DIR / "planner" / f"{name}.yaml")
     profile_config = OmegaConf.load(CONFIG_DIR / "model_pool" / f"{profile}.yaml")
-    merged = OmegaConf.merge({"model_pool": profile_config}, planner)
-    OmegaConf.resolve(merged)
-    return merged
+    return OmegaConf.merge({"model_pool": profile_config}, planner)
+
+
+def _raw(container, key):
+    """Unresolved value (interpolation strings kept verbatim)."""
+    return OmegaConf.to_container(container, resolve=False)[key]
 
 
 # ------------------------------------------------------------ model pool
@@ -45,6 +52,11 @@ def test_model_pool_composes_into_each_controller(profile, expected, config_name
     profile_config = OmegaConf.load(CONFIG_DIR / "model_pool" / f"{profile}.yaml")
     controller_config = OmegaConf.load(CONFIG_DIR / f"{config_name}.yaml")
     config = OmegaConf.merge({"model_pool": profile_config}, controller_config)
+    if "hydra" not in config:
+        # ${hydra:runtime.output_dir} only resolves inside a Hydra run.
+        controller = OmegaConf.select(config, controller_path) if controller_path else config
+        if "shared_memory_dir" in controller:
+            controller.shared_memory_dir = "/tmp/memory"
     OmegaConf.resolve(config)
 
     controller = OmegaConf.select(config, controller_path) if controller_path else config
@@ -57,19 +69,35 @@ def test_model_pool_composes_into_each_controller(profile, expected, config_name
     assert OmegaConf.select(controller, "request_timeout" if is_llm else "timeout_s") == 240
 
 
-@pytest.mark.parametrize("baseline", ("single_robot_primitive_harness", "single_agent_react_ollama"))
-def test_beta_baselines_select_default_model_pool_profile(baseline):
-    config, defaults = _baseline(baseline)
-    assert {"/model_pool": "gemma3_1b_off"} in defaults
-
-
 # ---------------------------------------------------------------- planners
 
-def test_random_planner_is_the_bridge_with_random_harness():
-    planner = OmegaConf.load(CONFIG_DIR / "planner" / "harness_random_planner.yaml")
-    assert planner._target_ == BRIDGE
-    assert planner.plan_config.harness._target_ == "harness_vla.envs.partnr.baselines.random_harness.RandomHarness"
+def test_central_planner_targets_env_centralized_planner_with_vla_controller():
+    planner = _planner("harness_vla_central")
+    harness = planner.plan_config.harness
+    assert planner._target_ == CENTRAL
+    assert harness._target_ == "harness_vla.envs.partnr.agent.HarnessVlaCentralized"
+    assert harness.use_claims is True
+    assert planner.plan_config.max_decisions == 100
     assert planner.plan_config.expose_bootstrap_label is False
+    assert harness.max_history == 0 and harness.zero_shot is True and harness.phase == "deployment"
+
+
+def test_decentral_planner_is_bridge_with_per_agent_vla_brain():
+    planner = _planner("harness_vla_decentral")
+    harness = planner.plan_config.harness
+    assert planner._target_ == BRIDGE
+    assert harness._target_ == "harness_vla.envs.partnr.decentralized.HarnessVlaDecentralized"
+    assert "${hydra:runtime.output_dir}" in _raw(harness, "shared_memory_dir")
+    assert planner.plan_config.symmetric_partner_snapshot is True
+    assert planner.plan_config.max_decisions == 50
+
+
+def test_central_and_decentral_share_the_llm_and_memory_knobs():
+    central = OmegaConf.load(CONFIG_DIR / "planner" / "harness_vla_central.yaml").plan_config.harness
+    decentral = OmegaConf.load(CONFIG_DIR / "planner" / "harness_vla_decentral.yaml").plan_config.harness
+    for knob in LLM_KNOBS:
+        assert knob in central and knob in decentral, knob
+        assert _raw(central, knob) == _raw(decentral, knob), knob
 
 
 def test_external_random_planner_targets_agent_side_loop_client():
@@ -79,74 +107,48 @@ def test_external_random_planner_targets_agent_side_loop_client():
     assert planner.plan_config.max_decisions == 8
     assert harness._target_ == "partnr_harness.external.ExternalLoopHarness"
     assert harness.agent_target == "harness_vla.envs.partnr.baselines.random_loop.RandomLoopAgent"
-    assert OmegaConf.to_container(harness.agent_kwargs) == {"max_steps": 6, "seed": 0}
 
 
-def test_react_planner_shares_llm_knobs_with_primitive_planner():
-    primitive = OmegaConf.to_container(_planner("harness_primitive_planner").plan_config.harness)
-    react = OmegaConf.to_container(_planner("harness_react_planner").plan_config.harness)
-    assert react.pop("_target_") == "harness_vla.envs.partnr.baselines.react.ReActHarness"
-    primitive.pop("_target_")
-    primitive.pop("prefix")
-    assert react.pop("max_transcript_chars") == 0
-    assert react == primitive
-
-
-def test_harness_vla_planner_matches_primitive_kwargs_plus_memory_knobs():
-    p = OmegaConf.to_container(_planner("harness_primitive_planner").plan_config.harness)
-    v = OmegaConf.to_container(_planner("harness_vla_planner").plan_config.harness)
-    assert v.pop("_target_") == "harness_vla.envs.partnr.adapter.PartnrHarnessAdapter"
-    p.pop("_target_")
-    extra = {k: v.pop(k) for k in ("max_history", "zero_shot", "task_memory_dir", "global_memory_path")}
-    assert extra == {"max_history": 0, "zero_shot": True, "task_memory_dir": None, "global_memory_path": None}
-    assert v == p
-
-
-def test_centralized_planner_config_resolves_model_pool():
-    config = _planner("harness_centralized_primitive_planner", profile="gemma4_12b_on")
-    assert config._target_ == "partnr_harness.centralized_planner.CentralizedHarnessPlanner"
-    assert (
-        config.plan_config.harness._target_
-        == "harness_vla.envs.partnr.legacy.centralized_primitive_harness.CentralizedPrimitiveHarness"
-    )
-    assert config.plan_config.harness.model == "gemma4:12b"
-    assert config.plan_config.harness.enable_thinking is True
-    assert config.plan_config.harness.num_ctx == 16384
-    assert config.plan_config.harness.temperature == 0.6
-    assert config.plan_config.harness.thinking_budget == 2048
+def test_react_llm_targets_agent_side_openai_compat_client():
+    llm = OmegaConf.load(CONFIG_DIR / "llm" / "ollama_chat.yaml")
+    assert llm.llm._target_ == "harness_vla.envs.partnr.react_llm.OpenAICompatChat"
 
 
 # --------------------------------------------------------------- baselines
 
-@pytest.mark.parametrize(
-    "baseline,planner",
-    [
-        ("two_agent_external_random", "harness_external_random_planner"),
-        ("two_agent_harness_vla", "harness_vla_planner"),
-        ("harness_demo", "harness_random_planner"),
-        ("two_robot_harness", "harness_random_planner"),
-    ],
-)
-def test_two_agent_baselines_use_the_planner_for_both_agents(baseline, planner):
+def test_only_three_two_agent_baselines_plus_env_smoke_exist():
+    names = sorted(p.stem for p in (CONFIG_DIR / "baselines").glob("*.yaml"))
+    assert names == [
+        "two_agent_external_random", "two_agent_react_ollama",
+        "two_agent_vla_central", "two_agent_vla_decentral",
+    ]
+    planners = sorted(p.stem for p in (CONFIG_DIR / "planner").glob("*.yaml"))
+    assert planners == ["harness_external_random_planner", "harness_vla_central", "harness_vla_decentral"]
+
+
+@pytest.mark.parametrize("baseline,planner", [
+    ("two_agent_vla_decentral", "harness_vla_decentral"),
+    ("two_agent_external_random", "harness_external_random_planner"),
+])
+def test_decentralized_baselines_use_the_planner_for_both_agents(baseline, planner):
     config, defaults = _baseline(baseline)
-    for agent in ("agent_0", "agent_1"):
-        assert {f"override /planner@evaluation.agents.{agent}.planner": planner} in defaults
-    if "model_pool" in {list(d)[0].lstrip("/") for d in defaults if isinstance(d, dict)}:
-        assert {"/model_pool": "gemma4_12b_off_4k"} in defaults
-
-
-def test_no_baseline_references_the_env_bridge_without_a_harness():
-    """``harness_bridge_planner`` (env side) has ``harness: ???``: agent yamls must not select it bare."""
-    for path in (CONFIG_DIR / "baselines").glob("*.yaml"):
-        assert "harness_bridge_planner" not in path.read_text(encoding="utf-8"), path.name
-
-
-def test_centralized_baseline_overrides():
-    config, defaults = _baseline("two_agent_centralized_harness")
-    assert {"/model_pool": "gemma4_12b_off_4k"} in defaults
-    assert {"override /evaluation": "centralized_evaluation_runner_multi_agent"} in defaults
-    assert {"override /planner@evaluation.planner": "harness_centralized_primitive_planner"} in defaults
-    for agent in ("agent_0", "agent_1"):
-        assert {f"override /agent@evaluation.agents.{agent}.config": "harness_primitive_agent"} in defaults
+    assert {"override /evaluation": "decentralized_evaluation_runner_multi_agent"} in defaults
+    for label in ("agent_0", "agent_1"):
+        assert {f"override /planner@evaluation.agents.{label}.planner": planner} in defaults
+        assert {f"override /agent@evaluation.agents.{label}.config": "harness_primitive_agent"} in defaults
     assert config.world_model.partial_obs is False
-    assert config.evaluation.save_video is True
+
+
+def test_central_baseline_uses_the_centralized_runner():
+    config, defaults = _baseline("two_agent_vla_central")
+    assert {"override /evaluation": "centralized_evaluation_runner_multi_agent"} in defaults
+    assert {"override /planner@evaluation.planner": "harness_vla_central"} in defaults
+    assert {"/model_pool": "gemma4_12b_off_4k"} in defaults
+    assert config.evaluation.save_video is False
+
+
+def test_react_baseline_is_upstream_react_with_oracle_skills():
+    _config, defaults = _baseline("two_agent_react_ollama")
+    assert {"override /planner@evaluation.agents.agent_0.planner": "llm_zero_shot_react_planner"} in defaults
+    assert {"override /llm@evaluation.agents.agent_0.planner.plan_config.llm": "ollama_chat"} in defaults
+    assert {"/model_pool": "gemma4_12b_off_4k"} in defaults

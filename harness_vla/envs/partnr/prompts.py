@@ -87,8 +87,27 @@ def _states_text(states: Any) -> str:
     return str(states) if states else ""
 
 
-def render_state(state: Mapping[str, Any], agent_uid: Optional[int] = None) -> str:
-    """Compact text of the structured state (rooms, furniture, objects, agents)."""
+def render_state(
+    state: Mapping[str, Any],
+    agent_uid: Optional[int] = None,
+    agent_names: Optional[Mapping[str, str]] = None,
+) -> str:
+    """Compact text of the structured state (rooms, furniture, objects, agents).
+
+    ``agent_uid`` renders that agent as "you" and the others as "partner";
+    ``agent_names`` (uid -> display name) overrides this for a controller that
+    addresses several agents by label.
+    """
+    names = {str(key): str(value) for key, value in (agent_names or {}).items()}
+
+    def who(uid: Any) -> str:
+        key = str(uid)
+        if key in names:
+            return names[key]
+        if agent_uid is not None and key == str(agent_uid):
+            return "you"
+        return "partner"
+
     lines: List[str] = []
     rooms = list(state.get("rooms") or [])
     furniture: Dict[str, Any] = state.get("furniture") or {}
@@ -118,8 +137,10 @@ def render_state(state: Mapping[str, Any], agent_uid: Optional[int] = None) -> s
         entry = entry or {}
         if entry.get("held_by") is not None:
             holder = entry["held_by"]
-            who = "you" if agent_uid is not None and str(holder) == str(agent_uid) else f"agent {holder}"
-            where = f"held by {who}"
+            holder_name = names.get(str(holder))
+            if holder_name is None:
+                holder_name = "you" if agent_uid is not None and str(holder) == str(agent_uid) else f"agent {holder}"
+            where = f"held by {holder_name}"
         elif entry.get("furniture"):
             relation = entry.get("relation") or "on"
             where = f"{relation} {entry['furniture']}"
@@ -135,9 +156,8 @@ def render_state(state: Mapping[str, Any], agent_uid: Optional[int] = None) -> s
         lines.append("  (none listed)")
     for key, entry in agents.items():
         entry = entry or {}
-        label = "you" if agent_uid is not None and str(key) == str(agent_uid) else "partner"
         holding = entry.get("holding") or "nothing"
-        lines.append(f"  agent {key} ({label}): in {entry.get('room') or 'unknown room'}, holding {holding}")
+        lines.append(f"  agent {key} ({who(key)}): in {entry.get('room') or 'unknown room'}, holding {holding}")
     return "\n".join(lines)
 
 
@@ -257,3 +277,211 @@ def step_context_to_dict(context: Any) -> Dict[str, Any]:
         "signals", "extras",
     )
     return {key: getattr(context, key, None) for key in keys}
+
+
+# ------------------------------------------------------------------- team
+# Prompts for the Harness VLA controllers (``agent.HarnessVlaCentralized`` and
+# ``decentralized.HarnessVlaDecentralized``): one JSON object per turn keyed
+# by agent label. The same builders serve both; the decentralized agent just
+# controls a single label and reads its partner's published transcript.
+
+TEAM_GUIDANCE = """\
+Operating rules (task-independent):
+  - Navigate to the furniture that holds an object before Pick; Navigate to the destination furniture before Place.
+  - Each agent holds one object at a time; Place it before picking another.
+  - Do not repeat an action that already succeeded; read the transcript before acting.
+  - If an action failed, change something (target, position, order) instead of re-issuing it unchanged.
+  - Never send two agents after the same object; split the work so both agents are useful.
+  - An agent still executing an action cannot receive a new one this turn."""
+
+TEAM_DONE_RULE = (
+    '  - Emit Done[] for an agent only when its part is complete; emit "all": "Done[]" '
+    "only when every part of the instruction is satisfied for the whole team."
+)
+SOLO_DONE_RULE = (
+    "  - Emit Done[] only when your own part is complete and nothing is left that "
+    "you can still do to finish the whole task."
+)
+
+
+def team_output_contract(labels: Sequence[str], allow_all: bool) -> str:
+    """Output shape: ``thought`` plus one key per controlled agent label."""
+    lines = ["Respond with a SINGLE JSON object and nothing else, in this exact shape:", "{"]
+    lines.append('  "thought": "<one or two sentences: current state, who does what now and why>",')
+    entries = [f'  "{label}": "Name[arg1, arg2]" or null' for label in labels]
+    if allow_all:
+        entries.append('  "all": null or "Done[]"')
+    lines.append(",\n".join(entries))
+    lines.append("}")
+    lines.append(
+        "Include a key only for the agents listed as awaiting a decision this turn; "
+        "use null to keep an agent idle. Each value is exactly one primitive call "
+        "Name[args] with exact entity names from the house state, or Done[]."
+    )
+    if allow_all:
+        lines.append('Set "all": "Done[]" when the WHOLE task is complete for the team.')
+    lines.append("Do not wrap the JSON in markdown fences. Output only the JSON object.")
+    return "\n".join(lines)
+
+
+def tools_text_by_agent(tools_by_agent: Mapping[str, Sequence[Any]]) -> str:
+    """Tool contracts grouped per agent label."""
+    blocks = []
+    for label in sorted(tools_by_agent):
+        text = tools_text_from_specs(tools_by_agent[label])
+        blocks.append(f"Tools of {label}:\n{text}" if text else f"Tools of {label}: (none reported)")
+    return "\n".join(blocks)
+
+
+def build_team_system_prompt(
+    role: str,
+    tools_by_agent: Mapping[str, Sequence[Any]],
+    global_memory_text: str,
+    labels: Sequence[str],
+    allow_all: bool,
+) -> str:
+    """Static part for a controller: role, primitives, per-agent tools, memory, output."""
+    parts = [" ".join(part for part in (role.strip(), PARTNR_ROLE_SUFFIX) if part)]
+    parts.append(PRIMITIVE_REFERENCE)
+    tools_text = tools_text_by_agent(tools_by_agent)
+    if tools_text.strip():
+        parts.append("Tool contracts reported by the environment:\n" + tools_text)
+    parts.append(TEAM_GUIDANCE + "\n" + (TEAM_DONE_RULE if allow_all else SOLO_DONE_RULE))
+    if global_memory_text.strip():
+        parts.append(global_memory_text.strip())
+    parts.append(team_output_contract(labels, allow_all))
+    return "\n\n".join(parts)
+
+
+def render_team_transcript_line(index: int, record: Mapping[str, Any]) -> str:
+    """``  3. agent_0: Pick[apple_0] -> success: ...`` (label-prefixed)."""
+    line = render_history_line(index, record)
+    label = record.get("agent")
+    if label:
+        head, _, tail = line.partition(". ")
+        return f"{head}. {label}: {tail}"
+    return line
+
+
+def render_team_transcript(
+    history: Sequence[Mapping[str, Any]], max_history: int = 0
+) -> List[str]:
+    shown = list(history) if not max_history or max_history <= 0 else list(history)[-max_history:]
+    omitted = len(history) - len(shown)
+    lines: List[str] = []
+    for offset, record in enumerate(shown):
+        index = record.get("decision_index")
+        index = int(index) + 1 if isinstance(index, int) else omitted + offset + 1
+        lines.append(render_team_transcript_line(index, record))
+    return lines
+
+
+def build_team_turn_prompt(
+    view: Mapping[str, Any],
+    history: Sequence[Mapping[str, Any]],
+    *,
+    resolved_task_memory: Optional[Sequence[str]] = None,
+    partner_task_memory: Optional[Sequence[str]] = None,
+    partner_transcript: Optional[Sequence[Mapping[str, Any]]] = None,
+    claims: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    max_history: int = 0,
+    state_char_budget: int = 12000,
+) -> str:
+    """Per-turn user message for a controller.
+
+    ``view`` keys: ``instruction``, ``decision_index``, ``max_decisions``,
+    ``state`` (structured) or ``world_description``, ``agent_names`` (uid ->
+    display name), ``deciding`` (labels awaiting a decision), ``busy`` (label
+    -> in-flight action), ``signals``. ``history`` records carry ``agent``.
+    """
+    lines: List[str] = []
+    instruction = str(view.get("instruction", "")).rstrip(".")
+    lines.append(f"Task instruction: {instruction}")
+    decision_index = view.get("decision_index")
+    max_decisions = view.get("max_decisions")
+    if decision_index is not None and max_decisions:
+        lines.append(f"Decision {int(decision_index) + 1} of {max_decisions} (budget).")
+    lines.append("")
+
+    state = view.get("state")
+    lines.append("House state (authoritative, current):")
+    if isinstance(state, Mapping) and (state.get("objects") or state.get("furniture")):
+        lines.append(_truncate(render_state(state, None, view.get("agent_names")), state_char_budget))
+    else:
+        lines.append(_truncate(str(view.get("world_description") or "(unavailable)"), state_char_budget))
+    lines.append("")
+
+    if claims:
+        lines.append("Assigned subgoals (claims). Emit Done[] for an agent only when ITS claim is complete:")
+        for label, claim in sorted(claims.items()):
+            flag = "DONE" if claim.get("done") else "TODO"
+            lines.append(f"  - {label}: [{flag}] {claim.get('description', '')}")
+        lines.append("")
+
+    if resolved_task_memory:
+        lines.append("Task Specific Memory structural prior (not an execution script):")
+        lines.append(
+            "  All entity names below were re-grounded from the CURRENT house state. "
+            "Use this only as a structural prior; the current state and transcript "
+            "take precedence."
+        )
+        for index, command in enumerate(resolved_task_memory, 1):
+            lines.append(f"  {index}. {command}")
+        lines.append("")
+
+    if partner_task_memory:
+        lines.append("Partner's remembered plan for this task (re-grounded; the partner may follow it):")
+        for index, command in enumerate(partner_task_memory, 1):
+            lines.append(f"  {index}. {command}")
+        lines.append("")
+
+    deciding = list(view.get("deciding") or [])
+    busy: Mapping[str, Any] = view.get("busy") or {}
+    if deciding:
+        lines.append("Agents awaiting your decision this turn: " + ", ".join(deciding))
+    if busy:
+        lines.append("Agents still executing (do NOT command them this turn):")
+        for label, action in sorted(busy.items()):
+            lines.append(f"  - {label}: running {action}; result pending" if action else f"  - {label}")
+    if deciding or busy:
+        lines.append("")
+
+    messages = []
+    for signal in view.get("signals") or []:
+        message = getattr(signal, "message", None)
+        if message is None and isinstance(signal, Mapping):
+            message = signal.get("message")
+        if message:
+            messages.append(str(message))
+    if messages:
+        lines.append("Warnings derived from the transcript:")
+        lines.extend(f"  - {message}" for message in messages)
+        lines.append("")
+
+    if partner_transcript is not None:
+        lines.append("Partner's transcript this episode, as published by the partner (most recent last):")
+        partner_lines = render_team_transcript(partner_transcript, max_history)
+        lines.extend(partner_lines or ["  (nothing published yet)"])
+        lines.append("")
+
+    own_header = (
+        "Transcript of your actions this episode (most recent last)"
+        if partner_transcript is not None
+        else "Team transcript this episode (most recent last)"
+    )
+    transcript_lines = render_team_transcript(history, max_history)
+    if transcript_lines:
+        omitted = len(history) - len(transcript_lines)
+        if omitted:
+            own_header += f" [{omitted} earlier steps omitted]"
+        lines.append(own_header + ":")
+        lines.extend(transcript_lines)
+    else:
+        lines.append("No actions executed yet this episode.")
+    lines.append("")
+
+    lines.append(
+        "Choose the single best next primitive for each agent awaiting a decision. "
+        "Respond with the JSON object described above."
+    )
+    return "\n".join(lines)
