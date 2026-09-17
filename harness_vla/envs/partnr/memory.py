@@ -217,8 +217,14 @@ def episode_transcript(records: Sequence[Mapping]) -> List[Dict[str, Any]]:
 
 def symbolic_steps(records: Sequence[Mapping]) -> List[Dict[str, Any]]:
     """Normalized, instance-free steps for ``memory.global_memory_extractor``."""
+    return steps_from_transcript(episode_transcript(records))
+
+
+def steps_from_transcript(transcript: Sequence[Mapping]) -> List[Dict[str, Any]]:
+    """``episode_transcript``-shaped steps (also controller history records)
+    -> extractor steps ``{turn, action, primitive, ok, error, instances}``."""
     steps: List[Dict[str, Any]] = []
-    for index, step in enumerate(episode_transcript(records)):
+    for index, step in enumerate(transcript):
         vocab = step.get("vocab") or {}
         parsed = parse_action(step["action"])
         instances = {
