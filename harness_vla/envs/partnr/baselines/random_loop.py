@@ -8,10 +8,15 @@ inversion.
 import random
 
 _ROOM_ARG = {"room"}
+# Tools whose skills are safe to fire with an arbitrary room/furniture argument.
+# State-changing skills (Pour, PowerOn/Off, Fill, Clean, Pick/Place, Open/Close)
+# on a random furniture can crash the simulator skill (observed:
+# ``Pour[bench_48]`` -> "'NoneType' object has no attribute 'object_id'").
+_SAFE_TOOLS = {"navigate", "explore", "wait"}
 
 
 def RandomLoopAgent(env, max_steps: int = 8, seed: int = 0) -> None:
-    """Random valid tools with room/furniture args, then Done.
+    """Random navigation/exploration with room/furniture args, then Done.
 
     ``env`` is a ``partnr_harness.external.PartnrEnvClient`` (duck-typed:
     ``reset()``, ``step()``, ``action_space()``, ``done``).
@@ -22,7 +27,7 @@ def RandomLoopAgent(env, max_steps: int = 8, seed: int = 0) -> None:
     candidates = [
         entry
         for entry in space
-        if entry["name"].lower() != "done" and len(entry.get("arg_names") or []) <= 1
+        if entry["name"].lower() in _SAFE_TOOLS and len(entry.get("arg_names") or []) <= 1
     ]
     for _ in range(max_steps):
         if env.done or not candidates:

@@ -379,6 +379,9 @@ class LLMClient:
     ) -> None:
         if enable_thinking and disable_thinking:
             raise ValueError("enable_thinking and disable_thinking are mutually exclusive")
+        # The env queue publishes the per-job endpoint (parallel Slurm jobs run
+        # one Ollama each on distinct ports); it wins over the YAML default.
+        base_url = os.environ.get("PARTNR_LLM_BASE_URL") or base_url
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
