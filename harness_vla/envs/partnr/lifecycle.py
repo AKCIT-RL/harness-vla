@@ -27,7 +27,7 @@ from harness_vla.envs.partnr.memory import (
     symbolic_steps,
     write_partnr_task_memory,
 )
-from harness_vla.envs.partnr.primitives import PARTNR_PRIMITIVE_NAMES, format_action
+from harness_vla.envs.partnr.primitives import active_primitive_names, format_action
 from harness_vla.memory import global_memory_extractor as extractor
 from harness_vla.planner.phase_policy import Phase
 from harness_vla.trace_io import write_json_atomic
@@ -59,7 +59,7 @@ def auto_extract_global_memory(
         episodes, transcript_fn=transcript_fn, success_fn=episode_success
     )
     candidates = extractor.propose_global_memory_candidates(
-        digests, llm, min_support=min_support, primitive_names=PARTNR_PRIMITIVE_NAMES
+        digests, llm, min_support=min_support, primitive_names=active_primitive_names()
     )
     report = extractor.promote_candidates(
         ledger,

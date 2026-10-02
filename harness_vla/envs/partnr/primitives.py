@@ -10,11 +10,17 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 __all__ = [
     "PARTNR_PRIMITIVE_NAMES",
     "PARTNR_PRIMITIVE_SIGNATURES",
+    "PARTNR_VOCABULARY",
+    "Vocabulary",
+    "active_primitive_names",
+    "active_vocabulary",
+    "use_vocabulary",
     "extract_json_object",
     "format_action",
     "parse_action",
@@ -38,6 +44,42 @@ PARTNR_PRIMITIVE_SIGNATURES: Dict[str, List[str]] = {
     "Done": [],
 }
 PARTNR_PRIMITIVE_NAMES: Tuple[str, ...] = tuple(PARTNR_PRIMITIVE_SIGNATURES)
+
+
+@dataclass(frozen=True)
+class Vocabulary:
+    """Primitive names (plus domain wording) the memory machinery works with.
+
+    PARTNR is the default. A new environment installs its own with
+    :func:`use_vocabulary` once per process, so Task/Global Memory keep only
+    that environment's primitives and the rule extractor describes the right
+    domain; nothing else in the controller is environment specific.
+    """
+
+    names: Tuple[str, ...]
+    domain: str = "a household robot"
+    instance_examples: str = "(cup_0, table_13, kitchen_1)"
+    scope: str = "houses"
+
+
+PARTNR_VOCABULARY = Vocabulary(PARTNR_PRIMITIVE_NAMES)
+_ACTIVE_VOCABULARY = PARTNR_VOCABULARY
+
+
+def use_vocabulary(vocabulary: Optional[Vocabulary]) -> Vocabulary:
+    """Install ``vocabulary`` (``None`` restores PARTNR) and return the previous one."""
+    global _ACTIVE_VOCABULARY
+    previous = _ACTIVE_VOCABULARY
+    _ACTIVE_VOCABULARY = vocabulary or PARTNR_VOCABULARY
+    return previous
+
+
+def active_vocabulary() -> Vocabulary:
+    return _ACTIVE_VOCABULARY
+
+
+def active_primitive_names() -> Tuple[str, ...]:
+    return _ACTIVE_VOCABULARY.names
 
 # Place keywords that are never entities and must stay literal.
 _LITERAL_ARGS = {"on", "within", "next_to", "none", ""}

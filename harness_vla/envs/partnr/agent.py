@@ -44,8 +44,9 @@ from harness_vla.envs.partnr.memory import (
     write_partnr_task_memory,
 )
 from harness_vla.envs.partnr.primitives import (
-    PARTNR_PRIMITIVE_NAMES,
+    active_primitive_names,
     extract_json_object,
+    use_vocabulary,
     format_action,
     parse_action,
     symbolize_partnr_action,
@@ -121,7 +122,7 @@ def labeled_skeleton(history: Sequence[Mapping[str, Any]]) -> List[str]:
         if not step.get("ok") or step.get("error_kind"):
             continue
         name = step.get("name")
-        if name not in PARTNR_PRIMITIVE_NAMES or name in ("Wait", "Done"):
+        if name not in active_primitive_names() or name in ("Wait", "Done"):
             continue
         vocab = step.get("vocab") or {}
         symbolic = symbolize_partnr_action(
@@ -224,10 +225,21 @@ class HarnessVlaCentralized(AgentHarness):
         phase: str = Phase.DEPLOYMENT.value,
         use_claims: bool = True,
         agent_descriptions: Optional[Mapping[str, str]] = None,
+        profile: Any = None,
         **kwargs: Any,
     ) -> None:
         if kwargs:
             _LOG.warning("%s ignoring unknown kwargs: %s", type(self).__name__, sorted(kwargs))
+        # ``profile`` (duck-typed, all attributes optional) adapts the prompts to
+        # another environment: ``role``, ``role_suffix``, ``primitive_reference``,
+        # ``guidance``, ``agent_descriptions``, ``vocabulary`` (primitives.Vocabulary).
+        self.profile = profile
+        if profile is not None:
+            role = getattr(profile, "role", None) or role
+            agent_descriptions = getattr(profile, "agent_descriptions", None) or agent_descriptions
+            vocabulary = getattr(profile, "vocabulary", None)
+            if vocabulary is not None:
+                use_vocabulary(vocabulary)
         self.role = role
         self.world_char_budget = int(world_char_budget)
         self.max_history = int(max_history)
@@ -332,6 +344,9 @@ class HarnessVlaCentralized(AgentHarness):
             memory_text,
             self.controlled,
             self.allow_all,
+            role_suffix=getattr(self.profile, "role_suffix", None),
+            primitive_reference=getattr(self.profile, "primitive_reference", None),
+            guidance=getattr(self.profile, "guidance", None),
         )
         if self.use_claims and self.allow_all:
             self._claims = self._decompose(context.instruction, self.controlled)
@@ -430,6 +445,8 @@ class HarnessVlaCentralized(AgentHarness):
             "decision_index": ctx.get("decision_index"),
             "max_decisions": ctx.get("max_decisions"),
             "state": extras.get("state"),
+            "rendered_state": extras.get("rendered_state"),
+            "state_title": extras.get("state_title"),
             "world_description": ctx.get("world_description"),
             "rooms": ctx.get("rooms"),
             "agent_names": self._agent_names(),

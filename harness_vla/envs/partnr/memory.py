@@ -37,7 +37,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from harness_vla.envs.partnr.primitives import (
-    PARTNR_PRIMITIVE_NAMES,
+    active_primitive_names,
+    active_vocabulary,
     extract_json_object,
     format_action,
     instance_category,
@@ -262,7 +263,7 @@ def skeleton_from_transcript(transcript: Sequence[Mapping]) -> List[str]:
     for step in transcript:
         if not step.get("ok") or step.get("error_kind"):
             continue
-        if step["name"] not in PARTNR_PRIMITIVE_NAMES or step["name"] == "Wait":
+        if step["name"] not in active_primitive_names() or step["name"] == "Wait":
             continue
         vocab = step.get("vocab") or {}
         commands.append(
@@ -480,7 +481,7 @@ def partnr_global_memory(ledger_path: Optional[str] = None) -> GlobalMemory:
         ledger_path,
         include_seed=True,
         base_memory=base,
-        primitive_names=PARTNR_PRIMITIVE_NAMES,
+        primitive_names=active_primitive_names(),
         provenance_validator=validate_trace_hash_provenance,
     )
 
@@ -489,21 +490,24 @@ def partnr_global_memory_ledger(ledger_path: str, *, read_only: bool = False) ->
     return GlobalMemoryLedger.load(
         ledger_path,
         read_only=read_only,
-        primitive_names=PARTNR_PRIMITIVE_NAMES,
+        primitive_names=active_primitive_names(),
         provenance_validator=validate_trace_hash_provenance,
     )
 
 
-_EXTRACTION_SYSTEM = (
-    "You distill task-independent operating knowledge for a household robot "
-    "that acts through the primitives "
-    + ", ".join(PARTNR_PRIMITIVE_NAMES)
-    + ". Rules must generalize across houses and tasks: NO instance ids "
-    "(cup_0, table_13, kitchen_1), NO room or object names specific to this "
-    "episode, NO restatement of the task. Reply with ONE JSON object only: "
-    '{"success_rules": [str, ...], "failure_models": [str, ...]} with at most '
-    "3 rules in total, each naming the primitive it applies to."
-)
+def extraction_system() -> str:
+    vocabulary = active_vocabulary()
+    return (
+        "You distill task-independent operating knowledge for "
+        f"{vocabulary.domain} that acts through the primitives "
+        + ", ".join(vocabulary.names)
+        + f". Rules must generalize across {vocabulary.scope} and tasks: NO instance ids "
+        f"{vocabulary.instance_examples}, NO room or object names specific to this "
+        "episode, NO restatement of the task. Reply with ONE JSON object only: "
+        '{"success_rules": [str, ...], "failure_models": [str, ...]} with at most '
+        "3 rules in total, each naming the primitive it applies to."
+    )
+
 
 _INSTANCE_ID = re.compile(r"\b[a-z][a-z_]*_\d+\b")
 
@@ -541,12 +545,13 @@ def _rule_texts(payload: Any, key: str) -> List[Tuple[str, Optional[str]]]:
 
 
 def _attribute_primitive(text: str, hint: Optional[str], transcript: Sequence[Mapping]) -> Optional[str]:
-    if hint in PARTNR_PRIMITIVE_NAMES:
+    names = active_primitive_names()
+    if hint in names:
         return hint
-    for name in PARTNR_PRIMITIVE_NAMES:
+    for name in names:
         if re.search(rf"\b{name}\b", text):
             return name
-    counts = Counter(step["name"] for step in transcript if step["name"] in PARTNR_PRIMITIVE_NAMES)
+    counts = Counter(step["name"] for step in transcript if step["name"] in names)
     return counts.most_common(1)[0][0] if counts else None
 
 
@@ -582,7 +587,7 @@ def extract_global_memory_candidates(
         transcript = episode_transcript(records)
         if not transcript:
             continue
-        raw = chat_fn(_EXTRACTION_SYSTEM, _extraction_user(transcript, success))
+        raw = chat_fn(extraction_system(), _extraction_user(transcript, success))
         payload = extract_json_object(raw or "")
         rules = [("success_rule", t, p) for t, p in _rule_texts(payload, "success_rules")]
         rules += [("failure_model", t, p) for t, p in _rule_texts(payload, "failure_models")]

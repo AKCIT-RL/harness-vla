@@ -339,14 +339,27 @@ def build_team_system_prompt(
     global_memory_text: str,
     labels: Sequence[str],
     allow_all: bool,
+    *,
+    role_suffix: Optional[str] = None,
+    primitive_reference: Optional[str] = None,
+    guidance: Optional[str] = None,
 ) -> str:
-    """Static part for a controller: role, primitives, per-agent tools, memory, output."""
-    parts = [" ".join(part for part in (role.strip(), PARTNR_ROLE_SUFFIX) if part)]
-    parts.append(PRIMITIVE_REFERENCE)
+    """Static part for a controller: role, primitives, per-agent tools, memory, output.
+
+    ``role_suffix``, ``primitive_reference`` and ``guidance`` default to the
+    PARTNR texts; another environment passes its own (see ``EnvProfile``).
+    """
+    suffix = PARTNR_ROLE_SUFFIX if role_suffix is None else role_suffix
+    parts = [" ".join(part for part in (role.strip(), suffix.strip()) if part)]
+    parts.append(PRIMITIVE_REFERENCE if primitive_reference is None else primitive_reference)
     tools_text = tools_text_by_agent(tools_by_agent)
     if tools_text.strip():
         parts.append("Tool contracts reported by the environment:\n" + tools_text)
-    parts.append(TEAM_GUIDANCE + "\n" + (TEAM_DONE_RULE if allow_all else SOLO_DONE_RULE))
+    parts.append(
+        (TEAM_GUIDANCE if guidance is None else guidance)
+        + "\n"
+        + (TEAM_DONE_RULE if allow_all else SOLO_DONE_RULE)
+    )
     if global_memory_text.strip():
         parts.append(global_memory_text.strip())
     parts.append(team_output_contract(labels, allow_all))
@@ -404,8 +417,10 @@ def build_team_turn_prompt(
     lines.append("")
 
     state = view.get("state")
-    lines.append("House state (authoritative, current):")
-    if isinstance(state, Mapping) and (state.get("objects") or state.get("furniture")):
+    lines.append(f"{view.get('state_title') or 'House state'} (authoritative, current):")
+    if view.get("rendered_state"):
+        lines.append(_truncate(str(view["rendered_state"]), state_char_budget))
+    elif isinstance(state, Mapping) and (state.get("objects") or state.get("furniture")):
         lines.append(_truncate(render_state(state, None, view.get("agent_names")), state_char_budget))
     else:
         lines.append(_truncate(str(view.get("world_description") or "(unavailable)"), state_char_budget))
