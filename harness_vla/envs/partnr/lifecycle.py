@@ -433,6 +433,49 @@ def bootstrap_from_queue(
     return audit
 
 
+def bootstrap_from_episodes(
+    out_dir: str,
+    episodes: Sequence[Mapping[str, Any]],
+    *,
+    min_support: int = 2,
+    min_success_rate: float = 0.5,
+    force: bool = False,
+) -> Dict[str, Any]:
+    """Central bootstrap from already-labelled episodes (environment agnostic).
+
+    ``episodes`` items: ``{"job_id", "episode_id", "instruction",
+    "task_state_success" (official 0/1), "traces": {"team": load_episode_trace(...)}}``.
+    Same outputs as ``bootstrap_from_queue(mode="central")``; any environment
+    that writes the centralized decision layout can use it (install its
+    ``Vocabulary`` first with ``primitives.use_vocabulary``).
+    """
+    out = Path(out_dir)
+    if out.exists() and any(out.iterdir()):
+        if not force:
+            raise FileExistsError(f"{out} is not empty (use force=True to rebuild)")
+        shutil.rmtree(out)
+    out.mkdir(parents=True, exist_ok=True)
+    audit: Dict[str, Any] = {
+        "phase": Phase.BOOTSTRAP.value,
+        "mode": "central",
+        "episodes": [
+            {"job_id": e.get("job_id"), "episode_id": e["episode_id"],
+             "task_state_success": e["task_state_success"], "traces": sorted(e["traces"])}
+            for e in episodes
+        ],
+        "successful_episodes": sum(1 for e in episodes if float(e["task_state_success"]) == 1.0),
+        "brains": [_bootstrap_memory(
+            out, episodes, own_label=None, trace_key="team",
+            min_support=min_support, min_success_rate=min_success_rate,
+        )],
+    }
+    audit["deployment"] = deployment_config(
+        str(out / "task_memory"), str(out / "global_memory" / GLOBAL_MEMORY_FILENAME)
+    )
+    write_json_atomic(str(out / "bootstrap_audit.json"), audit)
+    return audit
+
+
 def deploy_overrides(memory_dir: str, mode: str) -> List[str]:
     """Hydra overrides turning a bootstrap output into a frozen deployment run."""
     out = Path(memory_dir)
