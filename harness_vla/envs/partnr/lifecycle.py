@@ -320,8 +320,13 @@ def _bootstrap_memory(
     trace_key: str,
     min_support: int,
     min_success_rate: float,
+    llm: Optional[extractor.LlmFn] = None,
 ) -> Dict[str, Any]:
-    """Task Memory (successful episodes) + rule-based Global Memory for one brain."""
+    """Task Memory (successful episodes) + Global Memory for one brain.
+
+    Global Memory rules come from the rule-based extractor, or from ``llm``
+    (one message list -> JSON list) when given.
+    """
     from harness_vla.envs.partnr.agent import promote_labeled_transcript  # local: avoid cycle
 
     task_dir = out_dir / "task_memory" / (own_label or "")
@@ -361,6 +366,7 @@ def _bootstrap_memory(
     extractor_audit = auto_extract_global_memory(
         extractor_episodes,
         ledger,
+        llm=llm,
         transcript_fn=steps_from_transcript,
         min_support=min_support,
         min_success_rate=min_success_rate,
@@ -440,6 +446,7 @@ def bootstrap_from_episodes(
     min_support: int = 2,
     min_success_rate: float = 0.5,
     force: bool = False,
+    auto_extract_llm: Optional[extractor.LlmFn] = None,
 ) -> Dict[str, Any]:
     """Central bootstrap from already-labelled episodes (environment agnostic).
 
@@ -467,6 +474,7 @@ def bootstrap_from_episodes(
         "brains": [_bootstrap_memory(
             out, episodes, own_label=None, trace_key="team",
             min_support=min_support, min_success_rate=min_success_rate,
+            llm=auto_extract_llm,
         )],
     }
     audit["deployment"] = deployment_config(

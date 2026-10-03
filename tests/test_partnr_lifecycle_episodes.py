@@ -41,3 +41,23 @@ def test_central_bootstrap_writes_symbolic_task_memory_for_a_custom_vocabulary(t
     assert len(files) == 1
     assert "agent_0: GoToShelf[<obj:shelf>]" in files[0].read_text()
     assert audit["deployment"]["zero_shot"] is False
+
+
+def test_llm_extractor_rules_reach_global_memory(tmp_path):
+    previous = primitives.use_vocabulary(VOCAB)
+    seen = {}
+
+    def llm(messages):
+        seen["user"] = messages[-1]["content"]
+        return json.dumps([{"rule": "After GoToShelf succeeds, call GoToGoal for the same agent.",
+                            "kind": "success_rule", "evidence_episode_ids": ["e", "e2"]}])
+
+    try:
+        episodes = [_trace(tmp_path / "a.jsonl", True), _trace(tmp_path / "b.jsonl", True)]
+        episodes[1]["episode_id"] = "e2"
+        audit = bootstrap_from_episodes(str(tmp_path / "out"), episodes, min_support=2,
+                                        auto_extract_llm=llm)
+    finally:
+        primitives.use_vocabulary(previous)
+    assert "Episode e" in seen["user"]
+    assert audit["brains"][0]["auto_extractor"]["mode"] == "llm"
