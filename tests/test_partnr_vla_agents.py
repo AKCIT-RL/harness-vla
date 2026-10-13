@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from partnr_harness.contracts import (
+from akc_harness.contracts import (
     ActionResult,
     DoneDecision,
     EpisodeContext,

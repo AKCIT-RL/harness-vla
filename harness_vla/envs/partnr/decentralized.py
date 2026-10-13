@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
-from partnr_harness.contracts import (
+from akc_harness.contracts import (
     Decision,
     DoneDecision,
     EpisodeContext,
