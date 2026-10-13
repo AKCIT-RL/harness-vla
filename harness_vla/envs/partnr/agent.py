@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from partnr_harness.contracts import (
+from akc_harness.contracts import (
     ActionResult,
     AgentHarness,
     Decision,

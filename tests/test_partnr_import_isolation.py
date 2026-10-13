@@ -1,9 +1,10 @@
 """Agent side of the PARTNR separation must not reach into the simulator.
 
-``harness_vla.envs.partnr`` may import only the environment contract
-(``partnr_harness.contracts``) and, for loop-driving clients, the public
-reset/step types in ``partnr_harness.external``. Never ``habitat_llm`` and
-never the env internals (bridge/centralized planners, state, signals, queue).
+``harness_vla.envs.partnr`` may import only the agent contract
+(``akc_harness.contracts`` / ``akc_harness.signals``) and, for loop-driving
+clients, the public reset/step types in ``partnr_harness.external``. Never
+``habitat_llm`` and never the PARTNR env internals (bridge/centralized
+planners, state, queue).
 """
 
 import ast
@@ -13,7 +14,8 @@ from pathlib import Path
 import pytest
 
 PACKAGE = Path(__file__).resolve().parents[1] / "harness_vla" / "envs" / "partnr"
-ALLOWED_ENV_MODULES = {"partnr_harness.contracts", "partnr_harness.external"}
+ALLOWED_ENV_MODULES = {"partnr_harness.external"}
+ALLOWED_CONTRACT_MODULES = {"akc_harness.contracts", "akc_harness.signals"}
 FORBIDDEN_PREFIXES = ("habitat_llm", "habitat", "magnum")
 
 
@@ -40,6 +42,8 @@ def test_partnr_agent_module_does_not_import_simulator_or_env_internals(path):
         assert not module.startswith(FORBIDDEN_PREFIXES), f"{path.name} imports {module}"
         if module == "partnr_harness" or module.startswith("partnr_harness."):
             assert module in ALLOWED_ENV_MODULES, f"{path.name} imports env internals {module}"
+        if module == "akc_harness" or module.startswith("akc_harness."):
+            assert module in ALLOWED_CONTRACT_MODULES, f"{path.name} imports {module}"
 
 
 def test_grep_no_habitat_llm_anywhere_in_partnr_agent_code():

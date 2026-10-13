@@ -1,8 +1,8 @@
 """PARTNR (Habitat 3) agent side.
 
 The environment (bridge/centralized planners, tools, official metrics) lives
-in the ``partnr-harness`` superproject and defines the ``AgentHarness``
-contract in ``partnr_harness.contracts``. This package implements the agent:
+in the ``partnr-harness`` superproject; the ``AgentHarness`` contract it
+drives lives in ``akc_harness.contracts``. This package implements the agent:
 
 * ``primitives`` — PARTNR primitive vocabulary, JSON/bracket codec and
   instance-id symbolization;

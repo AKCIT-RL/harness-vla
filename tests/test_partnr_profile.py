@@ -2,7 +2,7 @@
 
 import pytest
 
-from partnr_harness.contracts import (
+from akc_harness.contracts import (
     EpisodeContext,
     StepContext,
     ToolCall,
