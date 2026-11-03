@@ -304,10 +304,18 @@ SOLO_DONE_RULE = (
 )
 
 
-def team_output_contract(labels: Sequence[str], allow_all: bool) -> str:
-    """Output shape: ``thought`` plus one key per controlled agent label."""
+DEFAULT_THOUGHT_SPEC = "<one or two sentences: current state, who does what now and why>"
+
+
+def team_output_contract(
+    labels: Sequence[str], allow_all: bool, thought_spec: Optional[str] = None
+) -> str:
+    """Output shape: ``thought`` plus one key per controlled agent label.
+
+    ``thought_spec`` replaces the default description of the ``thought`` field.
+    """
     lines = ["Respond with a SINGLE JSON object and nothing else, in this exact shape:", "{"]
-    lines.append('  "thought": "<one or two sentences: current state, who does what now and why>",')
+    lines.append(f'  "thought": "{thought_spec or DEFAULT_THOUGHT_SPEC}",')
     entries = [f'  "{label}": "Name[arg1, arg2]" or null' for label in labels]
     if allow_all:
         entries.append('  "all": null or "Done[]"')
@@ -343,6 +351,7 @@ def build_team_system_prompt(
     role_suffix: Optional[str] = None,
     primitive_reference: Optional[str] = None,
     guidance: Optional[str] = None,
+    thought_spec: Optional[str] = None,
 ) -> str:
     """Static part for a controller: role, primitives, per-agent tools, memory, output.
 
@@ -362,7 +371,7 @@ def build_team_system_prompt(
     )
     if global_memory_text.strip():
         parts.append(global_memory_text.strip())
-    parts.append(team_output_contract(labels, allow_all))
+    parts.append(team_output_contract(labels, allow_all, thought_spec))
     return "\n\n".join(parts)
 
 

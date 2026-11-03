@@ -347,6 +347,7 @@ class HarnessVlaCentralized(AgentHarness):
             role_suffix=getattr(self.profile, "role_suffix", None),
             primitive_reference=getattr(self.profile, "primitive_reference", None),
             guidance=getattr(self.profile, "guidance", None),
+            thought_spec=getattr(self.profile, "thought_spec", None),
         )
         if self.use_claims and self.allow_all:
             self._claims = self._decompose(context.instruction, self.controlled)
