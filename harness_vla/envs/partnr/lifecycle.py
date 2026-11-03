@@ -53,13 +53,19 @@ def auto_extract_global_memory(
     min_support: int = 2,
     min_success_rate: float = 0.5,
     transcript_fn=symbolic_steps,
+    system: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Run the automatic extractor + phase-gated promotion on bootstrap episodes."""
+    """Run the automatic extractor + phase-gated promotion on bootstrap episodes.
+
+    ``system`` replaces the extractor's default instructions (an environment's
+    own wording, e.g. what kind of rule to look for).
+    """
     digests = extractor.summarize_bootstrap_traces(
         episodes, transcript_fn=transcript_fn, success_fn=episode_success
     )
     candidates = extractor.propose_global_memory_candidates(
-        digests, llm, min_support=min_support, primitive_names=active_primitive_names()
+        digests, llm, min_support=min_support, primitive_names=active_primitive_names(),
+        system=system,
     )
     report = extractor.promote_candidates(
         ledger,
@@ -253,6 +259,7 @@ def labeled_transcript(records: Sequence[Mapping[str, Any]]) -> List[Dict[str, A
             target["status"] = "success" if result.get("success_hint") else "failure"
             target["ok"] = bool(result.get("success_hint"))
             target["failure_kind"] = result.get("failure_kind")
+            target["response"] = result.get("response")
     return history
 
 
@@ -321,11 +328,14 @@ def _bootstrap_memory(
     min_support: int,
     min_success_rate: float,
     llm: Optional[extractor.LlmFn] = None,
+    transcript_fn=None,
+    extraction_system: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Task Memory (successful episodes) + Global Memory for one brain.
 
     Global Memory rules come from the rule-based extractor, or from ``llm``
-    (one message list -> JSON list) when given.
+    (one message list -> JSON list) when given. ``transcript_fn`` and
+    ``extraction_system`` let an environment shape what the extractor reads.
     """
     from harness_vla.envs.partnr.agent import promote_labeled_transcript  # local: avoid cycle
 
@@ -367,9 +377,10 @@ def _bootstrap_memory(
         extractor_episodes,
         ledger,
         llm=llm,
-        transcript_fn=steps_from_transcript,
+        transcript_fn=transcript_fn or steps_from_transcript,
         min_support=min_support,
         min_success_rate=min_success_rate,
+        system=extraction_system,
     )
     ledger.save(str(ledger_path))
     rendered = global_dir / GLOBAL_MEMORY_FILENAME
@@ -447,6 +458,8 @@ def bootstrap_from_episodes(
     min_success_rate: float = 0.5,
     force: bool = False,
     auto_extract_llm: Optional[extractor.LlmFn] = None,
+    transcript_fn=None,
+    extraction_system: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Central bootstrap from already-labelled episodes (environment agnostic).
 
@@ -474,7 +487,8 @@ def bootstrap_from_episodes(
         "brains": [_bootstrap_memory(
             out, episodes, own_label=None, trace_key="team",
             min_support=min_support, min_success_rate=min_success_rate,
-            llm=auto_extract_llm,
+            llm=auto_extract_llm, transcript_fn=transcript_fn,
+            extraction_system=extraction_system,
         )],
     }
     audit["deployment"] = deployment_config(

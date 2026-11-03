@@ -269,7 +269,11 @@ class GlobalMemoryCandidate:
 def _leaks_instances(text: str, digests: Sequence[EpisodeDigest]) -> bool:
     lowered = text.lower()
     for digest in digests:
-        if any(name.lower() in lowered for name in digest.instances):
+        # whole names only: a short name ("pea") must not match inside a word ("repeat")
+        if any(
+            re.search(rf"(?<![a-z0-9_]){re.escape(name.lower())}(?![a-z0-9_])", lowered)
+            for name in digest.instances
+        ):
             return True
     return bool(_INSTANCE_ID.search(text))
 
@@ -347,7 +351,8 @@ def _render_digest(digest: EpisodeDigest) -> str:
     for step in digest.steps:
         status = {True: "ok", False: "FAILED"}.get(step.get("ok"), "n/a")
         error = f" ({_error_class(step.get('error'))})" if step.get("ok") is False else ""
-        lines.append(f"  t{step['turn']}: {step['action']} -> {status}{error}")
+        agent = f"{step['agent']}: " if step.get("agent") else ""
+        lines.append(f"  t{step['turn']}: {agent}{step['action']} -> {status}{error}")
     for recovery in digest.recoveries:
         lines.append(
             f"  recovery: {recovery.failed_primitive}/{recovery.error_class} -> "
@@ -359,9 +364,13 @@ def _render_digest(digest: EpisodeDigest) -> str:
 
 
 def build_extraction_messages(
-    digests: Sequence[EpisodeDigest], primitive_names: Sequence[str]
+    digests: Sequence[EpisodeDigest],
+    primitive_names: Sequence[str],
+    system: Optional[str] = None,
 ) -> List[Dict[str, str]]:
-    system = (
+    """``system`` replaces the default instructions, which must still ask for the
+    JSON list below (each rule naming one of ``primitive_names``)."""
+    system = system or (
         "You distill task-independent operating knowledge for a robot that acts "
         "through the primitives " + ", ".join(primitive_names) + ". Write general "
         "guidelines about HOW to use the primitives (what to do before what, how "
@@ -397,9 +406,10 @@ def _llm_candidates(
     llm: LlmFn,
     primitive_names: Sequence[str],
     min_support: int,
+    system: Optional[str] = None,
 ) -> List[GlobalMemoryCandidate]:
     by_id = {digest.episode_id: digest for digest in digests}
-    raw = llm(build_extraction_messages(digests, primitive_names))
+    raw = llm(build_extraction_messages(digests, primitive_names, system))
     candidates: List[GlobalMemoryCandidate] = []
     for item in _parse_json_list(raw):
         if not isinstance(item, dict) or set(item) & FORBIDDEN_OUTPUT_KEYS:
@@ -447,6 +457,7 @@ def propose_global_memory_candidates(
     *,
     min_support: int = 2,
     primitive_names: Optional[Sequence[str]] = None,
+    system: Optional[str] = None,
 ) -> List[GlobalMemoryCandidate]:
     """Digests -> candidate guidance with episode provenance.
 
@@ -459,7 +470,7 @@ def propose_global_memory_candidates(
     if llm is None:
         candidates = _rule_candidates(digests, min_support)
     else:
-        candidates = _llm_candidates(digests, llm, names, min_support)
+        candidates = _llm_candidates(digests, llm, names, min_support, system)
     return [
         candidate for candidate in candidates
         if candidate.primitive in names and not _leaks_instances(candidate.text, digests)
