@@ -308,15 +308,22 @@ DEFAULT_THOUGHT_SPEC = "<one or two sentences: current state, who does what now 
 
 
 def team_output_contract(
-    labels: Sequence[str], allow_all: bool, thought_spec: Optional[str] = None
+    labels: Sequence[str],
+    allow_all: bool,
+    thought_spec: Optional[str] = None,
+    max_plan: int = 1,
 ) -> str:
     """Output shape: ``thought`` plus one key per controlled agent label.
 
     ``thought_spec`` replaces the default description of the ``thought`` field.
+    ``max_plan`` > 1 also accepts a list of up to that many calls per agent.
     """
     lines = ["Respond with a SINGLE JSON object and nothing else, in this exact shape:", "{"]
     lines.append(f'  "thought": "{thought_spec or DEFAULT_THOUGHT_SPEC}",')
-    entries = [f'  "{label}": "Name[arg1, arg2]" or null' for label in labels]
+    value = '"Name[arg1, arg2]"'
+    if max_plan > 1:
+        value += ' or ["Name[arg1, arg2]", ...]'
+    entries = [f'  "{label}": {value} or null' for label in labels]
     if allow_all:
         entries.append('  "all": null or "Done[]"')
     lines.append(",\n".join(entries))
@@ -326,6 +333,13 @@ def team_output_contract(
         "use null to keep an agent idle. Each value is exactly one primitive call "
         "Name[args] with exact entity names from the house state, or Done[]."
     )
+    if max_plan > 1:
+        lines.append(
+            f"A list is a plan of up to {max_plan} calls for that agent, run one after "
+            "another without asking you again. The rest of a plan is dropped as soon as "
+            "one of its calls fails or something new comes up (such as a teammate "
+            "speaking), and you decide again."
+        )
     if allow_all:
         lines.append('Set "all": "Done[]" when the WHOLE task is complete for the team.')
     lines.append("Do not wrap the JSON in markdown fences. Output only the JSON object.")
@@ -352,6 +366,7 @@ def build_team_system_prompt(
     primitive_reference: Optional[str] = None,
     guidance: Optional[str] = None,
     thought_spec: Optional[str] = None,
+    max_plan: int = 1,
 ) -> str:
     """Static part for a controller: role, primitives, per-agent tools, memory, output.
 
@@ -371,7 +386,7 @@ def build_team_system_prompt(
     )
     if global_memory_text.strip():
         parts.append(global_memory_text.strip())
-    parts.append(team_output_contract(labels, allow_all, thought_spec))
+    parts.append(team_output_contract(labels, allow_all, thought_spec, max_plan))
     return "\n\n".join(parts)
 
 

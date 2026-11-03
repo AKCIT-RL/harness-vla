@@ -226,6 +226,7 @@ class HarnessVlaCentralized(AgentHarness):
         use_claims: bool = True,
         agent_descriptions: Optional[Mapping[str, str]] = None,
         profile: Any = None,
+        max_plan: int = 1,
         **kwargs: Any,
     ) -> None:
         if kwargs:
@@ -244,6 +245,10 @@ class HarnessVlaCentralized(AgentHarness):
         self.world_char_budget = int(world_char_budget)
         self.max_history = int(max_history)
         self.max_retries = int(max_retries)
+        # > 1: an agent's value may be a plan of up to max_plan calls, run without
+        # new LLM calls until one fails or the view's ``replan_key`` changes
+        self.max_plan = max(1, int(max_plan))
+        self._plans: Dict[str, Dict[str, Any]] = {}
         self.zero_shot = bool(zero_shot)
         self.task_memory_dir = task_memory_dir
         self.global_memory_path = global_memory_path
@@ -309,6 +314,7 @@ class HarnessVlaCentralized(AgentHarness):
         self._episode = context
         self._llm.start_episode(context.agent_uid)
         self.history = []
+        self._plans = {}
         self._claims = {}
         self.decompose_meta = None
         agents = (context.extras or {}).get("agents") or {
@@ -348,6 +354,7 @@ class HarnessVlaCentralized(AgentHarness):
             primitive_reference=getattr(self.profile, "primitive_reference", None),
             guidance=getattr(self.profile, "guidance", None),
             thought_spec=getattr(self.profile, "thought_spec", None),
+            max_plan=self.max_plan,
         )
         if self.use_claims and self.allow_all:
             self._claims = self._decompose(context.instruction, self.controlled)
@@ -454,6 +461,7 @@ class HarnessVlaCentralized(AgentHarness):
             "deciding": deciding,
             "busy": busy,
             "signals": ctx.get("signals") or [],
+            "replan_key": extras.get("replan_key"),
         }
 
     def _agent_names(self) -> Dict[str, str]:
@@ -516,6 +524,13 @@ class HarnessVlaCentralized(AgentHarness):
         deciding: List[str] = list(view.get("deciding") or [])
         state = view.get("state")
         vocab = self._vocab(state if isinstance(state, Mapping) else None, view.get("rooms"))
+        planned = self._next_planned(deciding, view, vocab)
+        if planned:
+            deciding = [label for label in deciding if label not in planned]
+            if not deciding:
+                self.last_meta = {"parse_attempts": 1, "from_plan": True}
+                return planned
+            view = {**view, "deciding": deciding}
         resolved: Optional[List[str]] = None
         if not self.zero_shot and self.task_memory and isinstance(state, Mapping):
             resolved = resolve_labeled_task_memory(self.task_memory, state) or None
@@ -574,7 +589,7 @@ class HarnessVlaCentralized(AgentHarness):
         rationale = self._thought(raw)
         decision_index = view.get("decision_index")
 
-        decisions: Dict[str, Optional[Decision]] = {}
+        decisions: Dict[str, Optional[Decision]] = dict(planned)
         if parsed is None:
             # Parse failure after retries: idle the deciding agents so the sim advances.
             for label in deciding:
@@ -611,10 +626,44 @@ class HarnessVlaCentralized(AgentHarness):
                 continue
             self._record(label, decision_index, name, args, vocab)
             decisions[label] = ToolCall(name, args, rationale=rationale, raw_output=raw, meta=meta)
+            rest = parsed.get("_plans", {}).get(label)
+            if rest:
+                self._plans[label] = {"calls": list(rest), "key": view.get("replan_key")}
 
         if parsed.get("all") is not None and self.allow_all:
             decisions["all"] = DoneDecision(rationale=rationale, raw_output=raw, meta=meta)
         return decisions
+
+    def _next_planned(
+        self, deciding: Sequence[str], view: Mapping[str, Any], vocab: Dict[str, set]
+    ) -> Dict[str, Decision]:
+        """Next call of each deciding agent's plan, if the plan still holds.
+
+        A plan is dropped when the agent's last call failed or the view's
+        ``replan_key`` (what the environment profile counts as news) changed.
+        """
+        out: Dict[str, Decision] = {}
+        for label in deciding:
+            plan = self._plans.get(label)
+            if not plan:
+                continue
+            last = next((r for r in reversed(self.history) if r.get("agent") == label), None)
+            if (
+                not plan["calls"]
+                or last is None
+                or not last.get("ok")
+                or plan["key"] != view.get("replan_key")
+            ):
+                self._plans.pop(label, None)
+                continue
+            name, args_list = plan["calls"].pop(0)
+            if not plan["calls"]:
+                self._plans.pop(label, None)
+            args = ",".join(args_list)
+            self._record(label, view.get("decision_index"), name, args, vocab)
+            out[label] = ToolCall(name, args, rationale="(next call of the plan)",
+                                  meta={"from_plan": True})
+        return out
 
     def _parse_team(self, raw: str, deciding: Sequence[str]) -> Optional[Dict[str, Any]]:
         """``{label: (name, args) | None, "all": True | None}`` or ``None`` if unusable."""
@@ -627,7 +676,18 @@ class HarnessVlaCentralized(AgentHarness):
             if label not in obj:
                 continue
             found = True
-            value = self._parse_value(obj[label])
+            raw_value = obj[label]
+            if isinstance(raw_value, list) and self.max_plan > 1:
+                calls = [self._parse_value(v) for v in raw_value[: self.max_plan]]
+                if any(call is False for call in calls):
+                    return None
+                calls = [call for call in calls if call is not None]
+                rest = [call for call in calls[1:] if call[0] != "Done"]
+                if calls and calls[0][0] != "Done" and rest:
+                    result.setdefault("_plans", {})[label] = rest
+                result[label] = calls[0] if calls else None
+                continue
+            value = self._parse_value(raw_value)
             if value is False:
                 return None
             result[label] = value
